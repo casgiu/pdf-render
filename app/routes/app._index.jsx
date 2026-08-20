@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { listCollections } from "../lib/shopify-data.server";
+import { listRecentJobs } from "../lib/catalogue-jobs.server";
 
 const buttonStyle = {
   display: "inline-block",
@@ -15,20 +16,26 @@ const buttonStyle = {
   fontFamily: "inherit",
 };
 
-const buttonStyleSmall = {
-  ...buttonStyle,
-  padding: "4px 10px",
-  fontSize: "13px",
+const buttonStyleSmall = { ...buttonStyle, padding: "4px 10px", fontSize: "13px" };
+
+const STATUS_LABELS = {
+  pending: "En attente…",
+  running: "Génération en cours…",
+  done: "Terminé",
+  error: "Échec",
 };
 
 export const loader = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-  const collections = await listCollections(admin);
+  const { admin, session } = await authenticate.admin(request);
+  const [collections, jobs] = await Promise.all([
+    listCollections(admin),
+    listRecentJobs(session.shop),
+  ]);
   const withProducts = collections
     .filter((c) => c.productsCount.count > 0)
     .sort((a, b) => a.title.localeCompare(b.title, "fr"));
 
-  return { collections: withProducts };
+  return { collections: withProducts, jobs };
 };
 
 function filenameFromResponse(response, fallback) {
@@ -37,39 +44,90 @@ function filenameFromResponse(response, fallback) {
   return match ? match[1] : fallback;
 }
 
+async function downloadBlob(url, fallbackName) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Le serveur a répondu ${response.status}`);
+  const blob = await response.blob();
+  const filename = filenameFromResponse(response, fallbackName);
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(blobUrl);
+}
+
 export default function CataloguePage({ loaderData }) {
   const { collections } = loaderData;
   const shopify = useAppBridge();
-  // null = rien en cours, sinon l'identifiant du bouton en cours de génération
-  // (permet de désactiver seulement ce bouton-là pendant l'attente).
-  const [pendingId, setPendingId] = useState(null);
+  const [jobs, setJobs] = useState(loaderData.jobs);
+  const pollTimers = useRef({});
 
-  async function downloadCatalogue(id, url, fallbackName) {
-    setPendingId(id);
-    try {
-      // `fetch` est patché par AppProvider pour y attacher le jeton de session
-      // Shopify — contrairement à une navigation <a href> classique, qui
-      // n'est pas authentifiée et atterrit sur la page de rebond OAuth.
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Le serveur a répondu ${response.status}`);
-      }
-      const blob = await response.blob();
-      const filename = filenameFromResponse(response, fallbackName);
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(blobUrl);
-    } catch (err) {
-      shopify.toast.show(`Échec du téléchargement : ${err.message}`, { isError: true });
-    } finally {
-      setPendingId(null);
+  useEffect(() => {
+    // Reprend le suivi des jobs encore en cours au chargement de la page
+    // (ex: on a relancé un catalogue complet puis fermé/rouvert l'app).
+    for (const job of loaderData.jobs) {
+      if (job.status === "pending" || job.status === "running") startPolling(job.id);
     }
+    return () => {
+      Object.values(pollTimers.current).forEach(clearInterval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function startPolling(jobId) {
+    if (pollTimers.current[jobId]) return;
+    pollTimers.current[jobId] = setInterval(async () => {
+      try {
+        const res = await fetch(`/app/catalogue/status/${jobId}`);
+        if (!res.ok) return;
+        const updated = await res.json();
+        setJobs((prev) => {
+          const exists = prev.some((j) => j.id === jobId);
+          const next = exists
+            ? prev.map((j) => (j.id === jobId ? { ...j, ...updated } : j))
+            : [{ ...updated, createdAt: new Date().toISOString() }, ...prev];
+          return next;
+        });
+        if (updated.status === "done" || updated.status === "error") {
+          clearInterval(pollTimers.current[jobId]);
+          delete pollTimers.current[jobId];
+          if (updated.status === "done") {
+            shopify.toast.show(`"${updated.label}" est prêt`);
+          } else {
+            shopify.toast.show(`Échec de "${updated.label}" : ${updated.errorMessage}`, { isError: true });
+          }
+        }
+      } catch {
+        // on retentera au prochain tick
+      }
+    }, 2500);
   }
+
+  async function startJob(type, collectionId, label) {
+    const body = new FormData();
+    body.set("type", type);
+    body.set("label", label);
+    if (collectionId) body.set("collectionId", collectionId);
+
+    const res = await fetch("/app/catalogue/start", { method: "POST", body });
+    if (!res.ok) {
+      shopify.toast.show("Échec du lancement de la génération", { isError: true });
+      return;
+    }
+    const { jobId } = await res.json();
+    setJobs((prev) => [
+      { id: jobId, type, label, status: "pending", createdAt: new Date().toISOString() },
+      ...prev,
+    ]);
+    startPolling(jobId);
+  }
+
+  const activeJobIds = new Set(
+    jobs.filter((j) => j.status === "pending" || j.status === "running").map((j) => j.id),
+  );
 
   return (
     <s-page heading="Catalogues PDF">
@@ -78,24 +136,20 @@ export default function CataloguePage({ loaderData }) {
           Un seul PDF avec tous les produits actifs, classés par les 7
           catégories du menu principal (Salons, Salle à manger, Chambres,
           Luminaires, Professionnels, Extérieur, Décorations). La génération
-          peut prendre plusieurs minutes selon le nombre de produits.
+          se fait en arrière-plan : tu peux fermer cette page, le catalogue
+          apparaîtra dans l'historique une fois prêt.
         </s-paragraph>
         <button
           type="button"
           style={buttonStyle}
-          disabled={pendingId === "full"}
-          onClick={() =>
-            downloadCatalogue("full", "/app/catalogue/download?type=full", "catalogue-complet.pdf")
-          }
+          onClick={() => startJob("full", null, "Catalogue complet")}
         >
-          {pendingId === "full" ? "Génération en cours…" : "Télécharger le catalogue complet"}
+          Générer le catalogue complet
         </button>
       </s-section>
 
       <s-section heading="Par collection">
-        <s-paragraph>
-          Génère un catalogue PDF pour une seule collection.
-        </s-paragraph>
+        <s-paragraph>Génère un catalogue PDF pour une seule collection.</s-paragraph>
         <s-table>
           <s-table-header-row>
             <s-table-header>Collection</s-table-header>
@@ -111,22 +165,62 @@ export default function CataloguePage({ loaderData }) {
                   <button
                     type="button"
                     style={buttonStyleSmall}
-                    disabled={pendingId === c.id}
-                    onClick={() =>
-                      downloadCatalogue(
-                        c.id,
-                        `/app/catalogue/download?type=collection&collection=${encodeURIComponent(c.id)}`,
-                        `catalogue-${c.handle}.pdf`,
-                      )
-                    }
+                    onClick={() => startJob("collection", c.id, c.title)}
                   >
-                    {pendingId === c.id ? "Génération…" : "Télécharger"}
+                    Générer
                   </button>
                 </s-table-cell>
               </s-table-row>
             ))}
           </s-table-body>
         </s-table>
+      </s-section>
+
+      <s-section heading="Historique">
+        {jobs.length === 0 ? (
+          <s-paragraph>Aucun catalogue généré pour l'instant.</s-paragraph>
+        ) : (
+          <s-table>
+            <s-table-header-row>
+              <s-table-header>Catalogue</s-table-header>
+              <s-table-header>Date</s-table-header>
+              <s-table-header>Statut</s-table-header>
+              <s-table-header></s-table-header>
+            </s-table-header-row>
+            <s-table-body>
+              {jobs.map((job) => (
+                <s-table-row key={job.id}>
+                  <s-table-cell>{job.label}</s-table-cell>
+                  <s-table-cell>
+                    {new Date(job.createdAt).toLocaleString("fr-FR", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}
+                  </s-table-cell>
+                  <s-table-cell>
+                    {job.status === "error" ? `Échec : ${job.errorMessage}` : STATUS_LABELS[job.status]}
+                  </s-table-cell>
+                  <s-table-cell>
+                    {job.status === "done" && (
+                      <button
+                        type="button"
+                        style={buttonStyleSmall}
+                        onClick={() =>
+                          downloadBlob(`/app/catalogue/file/${job.id}`, job.fileName || "catalogue.pdf").catch(
+                            (err) => shopify.toast.show(`Échec : ${err.message}`, { isError: true }),
+                          )
+                        }
+                      >
+                        Télécharger
+                      </button>
+                    )}
+                    {activeJobIds.has(job.id) && <s-spinner accessibilitylabel="Génération en cours" size="base" />}
+                  </s-table-cell>
+                </s-table-row>
+              ))}
+            </s-table-body>
+          </s-table>
+        )}
       </s-section>
     </s-page>
   );

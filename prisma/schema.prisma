@@ -32,3 +32,22 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+
+// Une génération de catalogue PDF, lancée en tâche de fond (fire-and-forget)
+// pour ne pas bloquer la requête HTTP le temps que ça prenne — un catalogue
+// complet avec des centaines de produits peut prendre plusieurs minutes.
+model CatalogueJob {
+  id           String    @id @default(cuid())
+  shop         String
+  type         String // "collection" | "full"
+  label        String // nom affiché (titre de collection, ou "Catalogue complet")
+  collectionId String? // gid Shopify de la collection, uniquement pour type="collection"
+  status       String    @default("pending") // pending | running | done | error
+  fileName    String?
+  filePath    String?
+  errorMessage String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([shop, createdAt])
+}
