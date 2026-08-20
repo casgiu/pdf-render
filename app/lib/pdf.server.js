@@ -8,16 +8,33 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOGO_PATH = path.join(__dirname, '..', '..', 'assets', 'logo.png');
 const LOGO_ASPECT_RATIO = 1086 / 1448; // hauteur / largeur du logo source
 
-const COLORS = {
+const DEFAULT_COLORS = {
   cream: '#F5F1EA',
   taupe: '#8A7B6C',
   darkBrown: '#3B2E24',
   gold: '#B08D57',
   lightLine: '#D8CFC0',
   white: '#FFFFFF',
-  stockOk: '#3B2E24',
-  stockOut: '#B0473E',
 };
+
+const DEFAULT_FONTS = { regular: 'Helvetica', bold: 'Helvetica-Bold', italic: 'Helvetica-Oblique' };
+const DEFAULT_TAGLINE = 'Mobilier & décoration haut de gamme';
+
+/** Construit les palettes couleurs/polices utilisées par les fonctions de dessin à partir du thème choisi dans l'app (avec les valeurs actuelles comme repli). */
+function resolveTheme(theme) {
+  return {
+    colors: {
+      cream: theme?.backgroundColor || DEFAULT_COLORS.cream,
+      darkBrown: theme?.textColor || DEFAULT_COLORS.darkBrown,
+      gold: theme?.accentColor || DEFAULT_COLORS.gold,
+      taupe: theme?.mutedColor || DEFAULT_COLORS.taupe,
+      lightLine: theme?.lineColor || DEFAULT_COLORS.lightLine,
+      white: DEFAULT_COLORS.white,
+    },
+    fonts: theme?.fonts || DEFAULT_FONTS,
+    tagline: theme?.tagline || DEFAULT_TAGLINE,
+  };
+}
 
 const DELAY_MSG = 'En commande sous 20 à 24 semaines';
 
@@ -30,7 +47,7 @@ function priceStr(amount, currency = 'EUR') {
   return `${withThousands},${decPart} ${symbol}`;
 }
 
-function drawImageOrPlaceholder(doc, imgPath, x, y, w, h) {
+function drawImageOrPlaceholder(doc, colors, imgPath, x, y, w, h) {
   if (imgPath && fs.existsSync(imgPath)) {
     try {
       const img = doc.openImage(imgPath);
@@ -50,18 +67,18 @@ function drawImageOrPlaceholder(doc, imgPath, x, y, w, h) {
   }
   // Placeholder vectoriel
   doc.save();
-  doc.rect(x, y, w, h).fill(COLORS.cream);
+  doc.rect(x, y, w, h).fill(colors.cream);
   doc.rect(x, y, w, h).lineWidth(1.5).stroke('#1A1512');
-  doc.fontSize(9).fillColor(COLORS.taupe)
+  doc.fontSize(9).fillColor(colors.taupe)
     .text('Photo produit indisponible', x, y + h / 2 - 5, { width: w, align: 'center' });
   doc.restore();
 }
 
-function drawCoverPage(doc, { title, subtitle, coverImagePath }) {
+function drawCoverPage(doc, { colors, fonts, tagline }, { title, subtitle, coverImagePath }) {
   const PAGE_W = doc.page.width;
   const PAGE_H = doc.page.height;
 
-  doc.rect(0, 0, PAGE_W, PAGE_H).fill(COLORS.cream);
+  doc.rect(0, 0, PAGE_W, PAGE_H).fill(colors.cream);
 
   // Logo en haut de la page (le mot-symbole "Homa Home" est déjà intégré à l'image).
   const logoW = 170;
@@ -72,51 +89,51 @@ function drawCoverPage(doc, { title, subtitle, coverImagePath }) {
   }
 
   const imgX = 40, imgY = logoY + logoH + 25, imgW = PAGE_W - 80, imgH = 290;
-  drawImageOrPlaceholder(doc, coverImagePath, imgX, imgY, imgW, imgH);
+  drawImageOrPlaceholder(doc, colors, coverImagePath, imgX, imgY, imgW, imgH);
 
-  doc.fontSize(14).fillColor(COLORS.gold).font('Helvetica-Oblique')
-    .text('Mobilier & décoration haut de gamme', 0, imgY + imgH + 65, { align: 'center' });
+  doc.fontSize(14).fillColor(colors.gold).font(fonts.italic)
+    .text(tagline, 0, imgY + imgH + 65, { align: 'center' });
 
-  doc.fontSize(16).fillColor(COLORS.darkBrown).font('Helvetica')
+  doc.fontSize(16).fillColor(colors.darkBrown).font(fonts.regular)
     .text(title, 0, PAGE_H - 120, { align: 'center' });
   if (subtitle) {
-    doc.fontSize(12).fillColor(COLORS.taupe).font('Helvetica')
+    doc.fontSize(12).fillColor(colors.taupe).font(fonts.regular)
       .text(subtitle, 0, PAGE_H - 95, { align: 'center' });
   }
 }
 
-function drawPresentationPage(doc, presentationText) {
+function drawPresentationPage(doc, { colors, fonts }, presentationText) {
   const PAGE_W = doc.page.width;
   const PAGE_H = doc.page.height;
 
-  doc.rect(0, 0, PAGE_W, PAGE_H).fill(COLORS.white);
+  doc.rect(0, 0, PAGE_W, PAGE_H).fill(colors.white);
   const margin = 70;
   let y = 100;
 
-  doc.fontSize(22).fillColor(COLORS.darkBrown).font('Helvetica-Bold')
+  doc.fontSize(22).fillColor(colors.darkBrown).font(fonts.bold)
     .text('Bienvenue chez Homa Home', margin, y);
   y += 40;
-  doc.moveTo(margin, y).lineTo(margin + 130, y).lineWidth(1.2).stroke(COLORS.gold);
+  doc.moveTo(margin, y).lineTo(margin + 130, y).lineWidth(1.2).stroke(colors.gold);
   y += 30;
 
-  doc.fontSize(13).fillColor(COLORS.darkBrown).font('Helvetica')
+  doc.fontSize(13).fillColor(colors.darkBrown).font(fonts.regular)
     .text(presentationText, margin, y, { width: PAGE_W - margin * 2, lineGap: 4 });
 }
 
 /** Page de séparation entre deux catégories, dans le catalogue complet. */
-function drawCategoryDividerPage(doc, categoryTitle, imagePath) {
+function drawCategoryDividerPage(doc, { colors, fonts }, categoryTitle, imagePath) {
   const PAGE_W = doc.page.width;
   const PAGE_H = doc.page.height;
 
-  doc.rect(0, 0, PAGE_W, PAGE_H).fill(COLORS.cream);
+  doc.rect(0, 0, PAGE_W, PAGE_H).fill(colors.cream);
 
   const imgX = 60, imgY = 140, imgW = PAGE_W - 120, imgH = 340;
-  drawImageOrPlaceholder(doc, imagePath, imgX, imgY, imgW, imgH);
+  drawImageOrPlaceholder(doc, colors, imagePath, imgX, imgY, imgW, imgH);
 
   doc.moveTo(PAGE_W / 2 - 65, imgY + imgH + 35).lineTo(PAGE_W / 2 + 65, imgY + imgH + 35)
-    .lineWidth(1.2).stroke(COLORS.gold);
+    .lineWidth(1.2).stroke(colors.gold);
 
-  doc.fontSize(30).fillColor(COLORS.darkBrown).font('Helvetica-Bold')
+  doc.fontSize(30).fillColor(colors.darkBrown).font(fonts.bold)
     .text(categoryTitle, 0, imgY + imgH + 55, { align: 'center' });
 }
 
@@ -125,7 +142,7 @@ function footerText(collectionLabel) {
 }
 
 /** Dessine les fiches produits (2 par page) pour une liste de produits, avec footer. */
-function drawProductPages(doc, products, footerLabel, pageNumRef) {
+function drawProductPages(doc, { colors, fonts }, products, footerLabel, pageNumRef) {
   const PAGE_W = doc.page.width;
   const PAGE_H = doc.page.height;
 
@@ -138,18 +155,18 @@ function drawProductPages(doc, products, footerLabel, pageNumRef) {
 
   function drawCard(p, topY) {
     const bottomY = topY + cardH;
-    drawImageOrPlaceholder(doc, p.localImagePath, pMargin, topY, imgWCard, cardH - 10);
+    drawImageOrPlaceholder(doc, colors, p.localImagePath, pMargin, topY, imgWCard, cardH - 10);
 
     const totalStock = p.variants.reduce((sum, v) => sum + Math.max(v.inventoryQuantity, 0), 0);
     const outOfStock = totalStock === 0;
 
     let ty = topY;
-    doc.fontSize(12.5).fillColor(COLORS.darkBrown).font('Helvetica-Bold')
+    doc.fontSize(12.5).fillColor(colors.darkBrown).font(fonts.bold)
       .text(p.title, contentX, ty, { width: contentW });
     ty = doc.y + 4;
 
     const price = p.priceRangeV2?.minVariantPrice;
-    doc.fontSize(11.5).fillColor(COLORS.gold).font('Helvetica-Bold')
+    doc.fontSize(11.5).fillColor(colors.gold).font(fonts.bold)
       .text(priceStr(price.amount, price.currencyCode), contentX, ty);
     ty = doc.y + 3;
 
@@ -157,7 +174,7 @@ function drawProductPages(doc, products, footerLabel, pageNumRef) {
     // (les articles en stock partent plus vite ; le stock lui-même n'est
     // volontairement pas affiché car il change en permanence).
     if (outOfStock) {
-      doc.fontSize(9).fillColor(COLORS.taupe).font('Helvetica-Oblique')
+      doc.fontSize(9).fillColor(colors.taupe).font(fonts.italic)
         .text(DELAY_MSG, contentX, ty);
       ty = doc.y + 5;
     } else {
@@ -166,7 +183,7 @@ function drawProductPages(doc, products, footerLabel, pageNumRef) {
 
     // Description affichée en entier (pas de troncature) : on mesure sa hauteur
     // réelle pour positionner correctement le bloc suivant.
-    doc.fontSize(9.5).fillColor(COLORS.darkBrown).font('Helvetica');
+    doc.fontSize(9.5).fillColor(colors.darkBrown).font(fonts.regular);
     const descHeight = doc.heightOfString(p.descriptionPlain, { width: contentW, lineGap: 3 });
     doc.text(p.descriptionPlain, contentX, ty, { width: contentW, lineGap: 3 });
     ty = ty + descHeight + 10;
@@ -175,7 +192,7 @@ function drawProductPages(doc, products, footerLabel, pageNumRef) {
     // affichées en une ligne compacte séparée par des puces.
     if (p.characteristics && p.characteristics.length > 0) {
       const charsLine = p.characteristics.map(c => `${c.label} : ${c.value}`).join('   •   ');
-      doc.fontSize(7.5).fillColor(COLORS.taupe).font('Helvetica');
+      doc.fontSize(7.5).fillColor(colors.taupe).font(fonts.regular);
       const charsHeight = doc.heightOfString(charsLine, { width: contentW, lineGap: 2 });
       doc.text(charsLine, contentX, ty, { width: contentW, lineGap: 2 });
       ty = ty + charsHeight + 10;
@@ -186,30 +203,30 @@ function drawProductPages(doc, products, footerLabel, pageNumRef) {
     // en haut de la fiche suffit.
     const singleVariant = p.variants.length === 1;
     if (!singleVariant) {
-      doc.fontSize(9).fillColor(COLORS.darkBrown).font('Helvetica-Bold')
+      doc.fontSize(9).fillColor(colors.darkBrown).font(fonts.bold)
         .text('Dimensions disponibles', contentX, ty);
       ty = doc.y + 5;
 
-      doc.fontSize(9).font('Helvetica');
+      doc.fontSize(9).font(fonts.regular);
       const col2 = contentX + contentW * 0.5;
       for (const v of p.variants.slice(0, 4)) {
-        doc.fillColor(COLORS.darkBrown).text(`• ${v.title}`, contentX, ty, { continued: false });
-        doc.fillColor(COLORS.darkBrown).text(priceStr(v.price), col2, ty);
+        doc.fillColor(colors.darkBrown).text(`• ${v.title}`, contentX, ty, { continued: false });
+        doc.fillColor(colors.darkBrown).text(priceStr(v.price), col2, ty);
         ty += 14;
       }
     }
 
-    doc.moveTo(pMargin, bottomY).lineTo(PAGE_W - pMargin, bottomY).lineWidth(0.5).stroke(COLORS.lightLine);
+    doc.moveTo(pMargin, bottomY).lineTo(PAGE_W - pMargin, bottomY).lineWidth(0.5).stroke(colors.lightLine);
   }
 
   for (let i = 0; i < products.length; i += 2) {
     doc.addPage();
-    doc.rect(0, 0, PAGE_W, PAGE_H).fill(COLORS.white);
+    doc.rect(0, 0, PAGE_W, PAGE_H).fill(colors.white);
 
     drawCard(products[i], pMargin);
     if (products[i + 1]) drawCard(products[i + 1], pMargin + cardH + cardGap);
 
-    doc.fontSize(9).fillColor(COLORS.taupe).font('Helvetica')
+    doc.fontSize(9).fillColor(colors.taupe).font(fonts.regular)
       .text(`${footerText(footerLabel)} — page ${pageNumRef.n}`, 0, PAGE_H - 30, { align: 'center' });
     pageNumRef.n++;
   }
@@ -222,8 +239,10 @@ function drawProductPages(doc, products, footerLabel, pageNumRef) {
  * @param {{title:string, image:string|null}} opts.collectionMeta
  * @param {Array} opts.products - [{title, descriptionHtml, priceRangeV2, variants, localImagePath}]
  * @param {string|null} opts.coverImagePath - chemin local de l'image de couverture (optionnel)
+ * @param {object} [opts.theme] - réglages visuels (couleurs, police, accroche) issus des réglages de l'app
  */
-export function generateCatalogPDF({ outputPath, collectionMeta, products, coverImagePath }) {
+export function generateCatalogPDF({ outputPath, collectionMeta, products, coverImagePath, theme }) {
+  const t = resolveTheme(theme);
   const doc = new PDFDocument({ size: 'A4', margin: 0 });
   const stream = fs.createWriteStream(outputPath);
   const finished = new Promise((resolve, reject) => {
@@ -232,7 +251,7 @@ export function generateCatalogPDF({ outputPath, collectionMeta, products, cover
   });
   doc.pipe(stream);
 
-  drawCoverPage(doc, { title: `Catalogue — ${collectionMeta.title}`, coverImagePath });
+  drawCoverPage(doc, t, { title: `Catalogue — ${collectionMeta.title}`, coverImagePath });
   doc.addPage();
 
   const presentationText =
@@ -242,9 +261,9 @@ export function generateCatalogPDF({ outputPath, collectionMeta, products, cover
     "un savoir-faire artisanal et une qualité durable. Nous livrons en Corse, en France et en Europe.\n\n" +
     `Ce catalogue présente notre sélection ${collectionMeta.title.toLowerCase()}. Chaque fiche produit détaille ` +
     "le prix et les dimensions disponibles.";
-  drawPresentationPage(doc, presentationText);
+  drawPresentationPage(doc, t, presentationText);
 
-  drawProductPages(doc, products, collectionMeta.title, { n: 1 });
+  drawProductPages(doc, t, products, collectionMeta.title, { n: 1 });
 
   doc.end();
   return finished;
@@ -257,8 +276,10 @@ export function generateCatalogPDF({ outputPath, collectionMeta, products, cover
  * @param {string} opts.outputPath
  * @param {string|null} opts.coverImagePath
  * @param {Array<{title:string, image:string|null, products:Array}>} opts.sections
+ * @param {object} [opts.theme] - réglages visuels (couleurs, police, accroche) issus des réglages de l'app
  */
-export function generateFullCatalogPDF({ outputPath, coverImagePath, sections }) {
+export function generateFullCatalogPDF({ outputPath, coverImagePath, sections, theme }) {
+  const t = resolveTheme(theme);
   const doc = new PDFDocument({ size: 'A4', margin: 0 });
   const stream = fs.createWriteStream(outputPath);
   const finished = new Promise((resolve, reject) => {
@@ -267,7 +288,7 @@ export function generateFullCatalogPDF({ outputPath, coverImagePath, sections })
   });
   doc.pipe(stream);
 
-  drawCoverPage(doc, {
+  drawCoverPage(doc, t, {
     title: 'Catalogue complet',
     subtitle: sections.map(s => s.title).join(' · '),
     coverImagePath,
@@ -281,14 +302,14 @@ export function generateFullCatalogPDF({ outputPath, coverImagePath, sections })
     "un savoir-faire artisanal et une qualité durable. Nous livrons en Corse, en France et en Europe.\n\n" +
     "Ce catalogue présente l'ensemble de notre collection, organisée par catégorie. Chaque fiche produit " +
     "détaille le prix et les dimensions disponibles.";
-  drawPresentationPage(doc, presentationText);
+  drawPresentationPage(doc, t, presentationText);
 
   const pageNumRef = { n: 1 };
   for (const section of sections) {
     if (section.products.length === 0) continue;
     doc.addPage();
-    drawCategoryDividerPage(doc, section.title, section.image);
-    drawProductPages(doc, section.products, section.title, pageNumRef);
+    drawCategoryDividerPage(doc, t, section.title, section.image);
+    drawProductPages(doc, t, section.products, section.title, pageNumRef);
   }
 
   doc.end();

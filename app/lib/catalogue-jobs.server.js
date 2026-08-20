@@ -14,6 +14,14 @@ import crypto from "crypto";
 import { downloadImage } from "./images.server";
 import { generateCatalogPDF, generateFullCatalogPDF } from "./pdf.server";
 import { generateFlipbook } from "./flipbook.server";
+import { getTheme, FONT_FAMILIES } from "./theme.server";
+
+/** Réglages de thème (couleurs, accroche) + police résolue depuis sa clé, prêts pour pdf.server.js. */
+async function resolvePdfTheme(shop) {
+  const theme = await getTheme(shop);
+  const fonts = FONT_FAMILIES[theme.fontFamily] || FONT_FAMILIES.helvetica;
+  return { ...theme, fonts };
+}
 
 // Sur Render, CATALOGUE_STORAGE_DIR pointe vers le disque persistant (/data/catalogues)
 // pour que les PDF survivent aux redémarrages/redéploiements. En local, on retombe
@@ -78,6 +86,7 @@ export async function runJob(jobId, admin) {
   try {
     const job = await prisma.catalogueJob.findUniqueOrThrow({ where: { id: jobId } });
     const outputPath = path.join(STORAGE_DIR, `${jobId}.pdf`);
+    const theme = await resolvePdfTheme(job.shop);
 
     let fileName;
     if (job.type === "full") {
@@ -95,13 +104,13 @@ export async function runJob(jobId, admin) {
       }
 
       const coverImagePath = sections.find((s) => s.image)?.image || null;
-      await generateFullCatalogPDF({ outputPath, coverImagePath, sections });
+      await generateFullCatalogPDF({ outputPath, coverImagePath, sections, theme });
       fileName = `catalogue-complet-${new Date().toISOString().slice(0, 10)}.pdf`;
     } else {
       const { collectionMeta, products } = await getProductsForCollection(admin, job.collectionId);
       const enriched = await enrichProducts(products);
       const coverImagePath = await downloadImage(collectionMeta.image, 900, 82);
-      await generateCatalogPDF({ outputPath, collectionMeta, products: enriched, coverImagePath });
+      await generateCatalogPDF({ outputPath, collectionMeta, products: enriched, coverImagePath, theme });
       fileName = `catalogue-${slugify(collectionMeta.title)}-${new Date().toISOString().slice(0, 10)}.pdf`;
     }
 

@@ -58,3 +58,18 @@ model CatalogueJob {
 
   @@index([shop, createdAt])
 }
+
+// Réglages visuels du catalogue PDF (couleurs, police, accroche), personnalisables
+// depuis l'app plutôt que codés en dur dans pdf.server.js. Une ligne par boutique.
+model CatalogueTheme {
+  id              String   @id @default(cuid())
+  shop            String   @unique
+  backgroundColor String   @default("#F5F1EA")
+  textColor       String   @default("#3B2E24")
+  accentColor     String   @default("#B08D57")
+  mutedColor      String   @default("#8A7B6C")
+  lineColor       String   @default("#D8CFC0")
+  fontFamily      String   @default("helvetica") // clé dans FONT_FAMILIES (pdf.server.js)
+  tagline         String   @default("Mobilier & décoration haut de gamme")
+  updatedAt       DateTime @updatedAt
+}
