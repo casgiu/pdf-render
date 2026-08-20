@@ -10,8 +10,10 @@ import {
   buildCharacteristics,
   MAIN_MENU_CATEGORIES,
 } from "./shopify-data.server";
+import crypto from "crypto";
 import { downloadImage } from "./images.server";
 import { generateCatalogPDF, generateFullCatalogPDF } from "./pdf.server";
+import { generateFlipbook } from "./flipbook.server";
 
 // Sur Render, CATALOGUE_STORAGE_DIR pointe vers le disque persistant (/data/catalogues)
 // pour que les PDF survivent aux redémarrages/redéploiements. En local, on retombe
@@ -114,4 +116,38 @@ export async function runJob(jobId, admin) {
       data: { status: "error", errorMessage: err.message?.slice(0, 500) || "Erreur inconnue", completedAt: new Date() },
     });
   }
+}
+
+/**
+ * Lance la génération d'un flipbook à partir du PDF déjà produit par un job
+ * terminé. Comme runJob, conçue pour être appelée sans `await`.
+ */
+export async function runFlipbookJob(jobId) {
+  await prisma.catalogueJob.update({ where: { id: jobId }, data: { flipbookStatus: "running" } });
+
+  try {
+    const job = await prisma.catalogueJob.findUniqueOrThrow({ where: { id: jobId } });
+    if (job.status !== "done" || !job.filePath || !fs.existsSync(job.filePath)) {
+      throw new Error("Le PDF de ce catalogue n'est pas disponible.");
+    }
+
+    const token = crypto.randomBytes(16).toString("hex");
+    const outputHtmlPath = path.join(STORAGE_DIR, "flipbooks", `${token}.html`);
+    await generateFlipbook(job.filePath, job.label, outputHtmlPath);
+
+    await prisma.catalogueJob.update({
+      where: { id: jobId },
+      data: { flipbookStatus: "done", flipbookToken: token, flipbookPath: outputHtmlPath },
+    });
+  } catch (err) {
+    console.error(`[flipbook-job ${jobId}] échec :`, err);
+    await prisma.catalogueJob.update({
+      where: { id: jobId },
+      data: { flipbookStatus: "error", flipbookError: err.message?.slice(0, 500) || "Erreur inconnue" },
+    });
+  }
+}
+
+export async function getJobByFlipbookToken(token) {
+  return prisma.catalogueJob.findUnique({ where: { flipbookToken: token } });
 }

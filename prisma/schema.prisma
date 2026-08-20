@@ -49,5 +49,12 @@ model CatalogueJob {
   createdAt   DateTime  @default(now())
   completedAt DateTime?
 
+  // Flipbook (livre à feuilleter) généré à partir du PDF de ce job, servi
+  // via une page publique non authentifiée (lien à partager avec des clients).
+  flipbookStatus String? // null | pending | running | done | error
+  flipbookToken  String? @unique
+  flipbookPath   String?
+  flipbookError  String?
+
   @@index([shop, createdAt])
 }

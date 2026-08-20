@@ -14,6 +14,7 @@ const buttonStyle = {
   fontSize: "14px",
   cursor: "pointer",
   fontFamily: "inherit",
+  textDecoration: "none",
 };
 
 const buttonStyleSmall = { ...buttonStyle, padding: "4px 10px", fontSize: "13px" };
@@ -79,6 +80,8 @@ export default function CataloguePage({ loaderData }) {
 
   function startPolling(jobId) {
     if (pollTimers.current[jobId]) return;
+    let lastStatus = null;
+    let lastFlipbookStatus = null;
     pollTimers.current[jobId] = setInterval(async () => {
       try {
         const res = await fetch(`/app/catalogue/status/${jobId}`);
@@ -91,14 +94,26 @@ export default function CataloguePage({ loaderData }) {
             : [{ ...updated, createdAt: new Date().toISOString() }, ...prev];
           return next;
         });
-        if (updated.status === "done" || updated.status === "error") {
+
+        if (updated.status !== lastStatus && (updated.status === "done" || updated.status === "error")) {
+          if (updated.status === "done") shopify.toast.show(`"${updated.label}" est prêt`);
+          else shopify.toast.show(`Échec de "${updated.label}" : ${updated.errorMessage}`, { isError: true });
+        }
+        if (
+          updated.flipbookStatus !== lastFlipbookStatus &&
+          (updated.flipbookStatus === "done" || updated.flipbookStatus === "error")
+        ) {
+          if (updated.flipbookStatus === "done") shopify.toast.show(`Flipbook de "${updated.label}" prêt`);
+          else shopify.toast.show(`Échec du flipbook : ${updated.flipbookError}`, { isError: true });
+        }
+        lastStatus = updated.status;
+        lastFlipbookStatus = updated.flipbookStatus;
+
+        const catalogueSettled = updated.status === "done" || updated.status === "error";
+        const flipbookSettled = !updated.flipbookStatus || updated.flipbookStatus === "done" || updated.flipbookStatus === "error";
+        if (catalogueSettled && flipbookSettled) {
           clearInterval(pollTimers.current[jobId]);
           delete pollTimers.current[jobId];
-          if (updated.status === "done") {
-            shopify.toast.show(`"${updated.label}" est prêt`);
-          } else {
-            shopify.toast.show(`Échec de "${updated.label}" : ${updated.errorMessage}`, { isError: true });
-          }
         }
       } catch {
         // on retentera au prochain tick
@@ -125,8 +140,21 @@ export default function CataloguePage({ loaderData }) {
     startPolling(jobId);
   }
 
+  async function startFlipbook(jobId) {
+    setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, flipbookStatus: "pending" } : j)));
+    const res = await fetch(`/app/catalogue/flipbook/${jobId}`, { method: "POST" });
+    if (!res.ok) {
+      shopify.toast.show("Échec du lancement du flipbook", { isError: true });
+      return;
+    }
+    startPolling(jobId);
+  }
+
   const activeJobIds = new Set(
     jobs.filter((j) => j.status === "pending" || j.status === "running").map((j) => j.id),
+  );
+  const activeFlipbookIds = new Set(
+    jobs.filter((j) => j.flipbookStatus === "pending" || j.flipbookStatus === "running").map((j) => j.id),
   );
 
   return (
@@ -202,17 +230,43 @@ export default function CataloguePage({ loaderData }) {
                   </s-table-cell>
                   <s-table-cell>
                     {job.status === "done" && (
-                      <button
-                        type="button"
-                        style={buttonStyleSmall}
-                        onClick={() =>
-                          downloadBlob(`/app/catalogue/file/${job.id}`, job.fileName || "catalogue.pdf").catch(
-                            (err) => shopify.toast.show(`Échec : ${err.message}`, { isError: true }),
-                          )
-                        }
-                      >
-                        Télécharger
-                      </button>
+                      <s-stack direction="inline" gap="base">
+                        <button
+                          type="button"
+                          style={buttonStyleSmall}
+                          onClick={() =>
+                            downloadBlob(`/app/catalogue/file/${job.id}`, job.fileName || "catalogue.pdf").catch(
+                              (err) => shopify.toast.show(`Échec : ${err.message}`, { isError: true }),
+                            )
+                          }
+                        >
+                          Télécharger
+                        </button>
+
+                        {!job.flipbookStatus && (
+                          <button type="button" style={buttonStyleSmall} onClick={() => startFlipbook(job.id)}>
+                            Créer un flipbook
+                          </button>
+                        )}
+                        {activeFlipbookIds.has(job.id) && (
+                          <s-spinner accessibilitylabel="Génération du flipbook en cours" size="base" />
+                        )}
+                        {job.flipbookStatus === "error" && (
+                          <button type="button" style={buttonStyleSmall} onClick={() => startFlipbook(job.id)}>
+                            Réessayer le flipbook
+                          </button>
+                        )}
+                        {job.flipbookStatus === "done" && (
+                          <a
+                            href={`/flipbook/${job.flipbookToken}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={buttonStyleSmall}
+                          >
+                            Ouvrir le flipbook
+                          </a>
+                        )}
+                      </s-stack>
                     )}
                     {activeJobIds.has(job.id) && <s-spinner accessibilitylabel="Génération en cours" size="base" />}
                   </s-table-cell>

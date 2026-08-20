@@ -1,7 +1,7 @@
 FROM node:20-slim
 # glibc (plutôt qu'alpine/musl) pour une compatibilité fiable avec les binaires
 # précompilés de sharp (traitement d'images du générateur de catalogue PDF).
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates poppler-utils \
   && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 3000

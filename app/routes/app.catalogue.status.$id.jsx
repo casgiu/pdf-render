@@ -16,5 +16,8 @@ export const loader = async ({ request, params }) => {
     label: job.label,
     fileName: job.fileName,
     errorMessage: job.errorMessage,
+    flipbookStatus: job.flipbookStatus,
+    flipbookToken: job.flipbookToken,
+    flipbookError: job.flipbookError,
   });
 };
