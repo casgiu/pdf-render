@@ -49,9 +49,13 @@ Nécessite d'être connecté au bon compte Shopify (`shopify auth login` déjà 
 4. **`.env` doit être exclu du build Docker** (`.dockerignore`) sinon la valeur locale de `DATABASE_URL` écrase celle fournie par Render en prod → perte des sessions à chaque déploiement.
 5. **`render.yaml`** n'est appliqué automatiquement que via un déploiement "Blueprint" sur Render — un service créé à la main ignore ce fichier. Toute nouvelle variable d'env ajoutée au fichier doit être vérifiée/ajoutée manuellement dans le dashboard Render si le service existe déjà.
 
-## Prochaine étape en attente
+## Statut
 
-Installer l'app sur la vraie boutique `w2543v-77.myshopify.com` (pas seulement la boutique de test) et valider le catalogue complet avec les vraies 7 catégories (Salons, Salle à manger, Chambres, Luminaires, Professionnels, Extérieur, Décorations) et les vrais produits/metafields.
+✅ App installée sur la vraie boutique `w2543v-77.myshopify.com` (homa-home-2).
+✅ Catalogue complet validé en conditions réelles (7 vraies catégories, tous les produits) : ~14 Mo, généré en tâche de fond sans timeout.
+✅ Flipbook validé en conditions réelles à partir de ce catalogue complet.
+
+Rien de bloquant en attente à ce stade — l'app est fonctionnelle de bout en bout.
 
 ## Idées pour la suite (non commencées)
 
