@@ -5,6 +5,7 @@ import { isFlipbookPublic } from "../app/lib/catalogue-jobs.server.js";
 import { purgeShopData } from "../app/lib/shop-data-purge.server.js";
 import { parseCatalogueJobInput } from "../app/lib/job-input.server.js";
 import { escapeHtml } from "../app/lib/flipbook.server.js";
+import { isPublicIpAddress, parsePublicImageUrl } from "../app/lib/images.server.js";
 
 test("l’onboarding exige une marque et un menu", () => {
   assert.equal(isOnboardingComplete({ brandName: "Atelier", mainMenuHandle: "principal" }), true);
@@ -38,6 +39,17 @@ test("la création de catalogue refuse les données incohérentes", () => {
     collectionId: null,
     label: "Mon catalogue",
   });
+});
+
+test("les URLs d’images sont limitées à HTTPS et aux adresses publiques", () => {
+  assert.equal(isPublicIpAddress("8.8.8.8"), true);
+  assert.equal(isPublicIpAddress("127.0.0.1"), false);
+  assert.equal(isPublicIpAddress("169.254.169.254"), false);
+  assert.equal(isPublicIpAddress("::1"), false);
+  assert.throws(() => parsePublicImageUrl("http://example.com/logo.png"));
+  assert.throws(() => parsePublicImageUrl("https://user:password@example.com/logo.png"));
+  assert.throws(() => parsePublicImageUrl("https://example.com:8443/logo.png"));
+  assert.equal(parsePublicImageUrl("https://cdn.shopify.com/logo.png").hostname, "cdn.shopify.com");
 });
 
 test("l’effacement boutique retire les objets, tâches et lignes persistées", async () => {
