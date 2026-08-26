@@ -88,6 +88,7 @@ export async function getJob(id, shop) {
 }
 
 export async function listRecentJobs(shop, limit = 15) {
+  await pruneExistingDuplicates(shop);
   return prisma.catalogueJob.findMany({
     where: { shop },
     orderBy: { createdAt: "desc" },
@@ -103,10 +104,46 @@ async function removeSupersededJobs(currentJob) {
     where: { ...scope, id: { not: currentJob.id }, status: { in: ["done", "error"] } },
   });
 
-  for (const previousJob of previousJobs) {
-    await deleteObject(previousJob.fileKey);
-    await deleteObject(previousJob.flipbookKey);
-    await prisma.catalogueJob.delete({ where: { id: previousJob.id } });
+  for (const previousJob of previousJobs) await removeJobAndAssets(previousJob);
+}
+
+async function removeJobAndAssets(job) {
+  await deleteObject(job.fileKey);
+  await deleteObject(job.flipbookKey);
+  await prisma.catalogueJob.delete({ where: { id: job.id } });
+}
+
+async function pruneExistingDuplicates(shop) {
+  const jobs = await prisma.catalogueJob.findMany({
+    where: { shop },
+    orderBy: { createdAt: "desc" },
+  });
+  const activeScopes = new Set(
+    jobs
+      .filter((job) => ["pending", "running"].includes(job.status))
+      .map((job) => `${job.type}:${job.collectionId || ""}`),
+  );
+  const retainedScopes = new Set();
+
+  for (const job of jobs) {
+    const scope = `${job.type}:${job.collectionId || ""}`;
+    if (activeScopes.has(scope) || !["done", "error"].includes(job.status)) continue;
+
+    // Préférer une génération réussie à une tentative en erreur, puis la plus récente.
+    if (!retainedScopes.has(scope) && job.status === "done") {
+      retainedScopes.add(scope);
+      continue;
+    }
+    if (!retainedScopes.has(scope) && job.status === "error") {
+      const hasSuccessfulJob = jobs.some((candidate) =>
+        `${candidate.type}:${candidate.collectionId || ""}` === scope && candidate.status === "done",
+      );
+      if (!hasSuccessfulJob) {
+        retainedScopes.add(scope);
+        continue;
+      }
+    }
+    await removeJobAndAssets(job);
   }
 }
 
