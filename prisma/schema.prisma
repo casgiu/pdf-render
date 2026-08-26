@@ -44,6 +44,7 @@ model CatalogueJob {
   collectionId String? // gid Shopify de la collection, uniquement pour type="collection"
   status       String    @default("pending") // pending | running | done | error
   fileName    String?
+  fileKey     String?   // clé R2 (PDF); filePath est gardé pour les anciens catalogues locaux
   filePath    String?
   errorMessage String?
   createdAt   DateTime  @default(now())
@@ -53,6 +54,7 @@ model CatalogueJob {
   // via une page publique non authentifiée (lien à partager avec des clients).
   flipbookStatus String? // null | pending | running | done | error
   flipbookToken  String? @unique
+  flipbookKey    String? // clé R2 (HTML); flipbookPath est gardé pour les anciens flipbooks locaux
   flipbookPath   String?
   flipbookError  String?
 

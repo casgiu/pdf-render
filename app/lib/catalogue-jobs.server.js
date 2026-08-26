@@ -16,6 +16,7 @@ import { downloadImage } from "./images.server";
 import { generateCatalogPDF, generateFullCatalogPDF } from "./pdf.server";
 import { generateFlipbook } from "./flipbook.server";
 import { getTheme, FONT_FAMILIES } from "./theme.server";
+import { downloadObjectToFile, uploadFile } from "./object-storage.server";
 
 /** Réglages de thème (couleurs, accroche) + police résolue depuis sa clé, prêts pour pdf.server.js. */
 async function resolvePdfTheme(shop) {
@@ -25,10 +26,9 @@ async function resolvePdfTheme(shop) {
   return { ...theme, fonts, logoPath };
 }
 
-// Sur Render, CATALOGUE_STORAGE_DIR pointe vers le disque persistant (/data/catalogues)
-// pour que les PDF survivent aux redémarrages/redéploiements. En local, on retombe
-// sur un dossier temporaire.
-const STORAGE_DIR = process.env.CATALOGUE_STORAGE_DIR || path.join(os.tmpdir(), "pdf-render-catalogues");
+// R2 est la source de vérité. Le disque local ne sert plus qu'aux fichiers
+// temporaires nécessaires à pdfkit et pdftoppm.
+const STORAGE_DIR = path.join(os.tmpdir(), "pdf-render-catalogues");
 if (!fs.existsSync(STORAGE_DIR)) fs.mkdirSync(STORAGE_DIR, { recursive: true });
 
 function slugify(text) {
@@ -126,9 +126,14 @@ export async function runJob(jobId, admin) {
       fileName = `catalogue-${slugify(collectionMeta.title)}-${new Date().toISOString().slice(0, 10)}.pdf`;
     }
 
+    const fileKey = `catalogues/${job.shop}/${jobId}.pdf`;
+    await uploadFile(fileKey, outputPath, "application/pdf");
     await prisma.catalogueJob.update({
       where: { id: jobId },
-      data: { status: "done", filePath: outputPath, fileName, completedAt: new Date() },
+      data: { status: "done", fileKey, filePath: null, fileName, completedAt: new Date() },
+    });
+    await fs.promises.rm(outputPath, { force: true }).catch((cleanupError) => {
+      console.warn(`[catalogue-job ${jobId}] nettoyage du PDF temporaire impossible :`, cleanupError);
     });
   } catch (err) {
     console.error(`[catalogue-job ${jobId}] échec :`, err);
@@ -148,17 +153,31 @@ export async function runFlipbookJob(jobId) {
 
   try {
     const job = await prisma.catalogueJob.findUniqueOrThrow({ where: { id: jobId } });
-    if (job.status !== "done" || !job.filePath || !fs.existsSync(job.filePath)) {
+    if (job.status !== "done" || (!job.fileKey && (!job.filePath || !fs.existsSync(job.filePath)))) {
       throw new Error("Le PDF de ce catalogue n'est pas disponible.");
     }
 
     const token = crypto.randomBytes(16).toString("hex");
+    const localPdfPath = job.fileKey
+      ? path.join(STORAGE_DIR, `${jobId}-flipbook.pdf`)
+      : job.filePath;
     const outputHtmlPath = path.join(STORAGE_DIR, "flipbooks", `${token}.html`);
-    await generateFlipbook(job.filePath, job.label, outputHtmlPath);
+    if (job.fileKey) await downloadObjectToFile(job.fileKey, localPdfPath);
+    await generateFlipbook(localPdfPath, job.label, outputHtmlPath);
+    const flipbookKey = `flipbooks/${job.shop}/${token}.html`;
+    await uploadFile(flipbookKey, outputHtmlPath, "text/html; charset=utf-8");
 
     await prisma.catalogueJob.update({
       where: { id: jobId },
-      data: { flipbookStatus: "done", flipbookToken: token, flipbookPath: outputHtmlPath },
+      data: { flipbookStatus: "done", flipbookToken: token, flipbookKey, flipbookPath: null },
+    });
+    if (job.fileKey) {
+      await fs.promises.rm(localPdfPath, { force: true }).catch((cleanupError) => {
+        console.warn(`[flipbook-job ${jobId}] nettoyage du PDF temporaire impossible :`, cleanupError);
+      });
+    }
+    await fs.promises.rm(outputHtmlPath, { force: true }).catch((cleanupError) => {
+      console.warn(`[flipbook-job ${jobId}] nettoyage du HTML temporaire impossible :`, cleanupError);
     });
   } catch (err) {
     console.error(`[flipbook-job ${jobId}] échec :`, err);
