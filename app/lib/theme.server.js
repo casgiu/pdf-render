@@ -18,6 +18,8 @@ const DEFAULTS = {
   lineColor: "#D8CFC0",
   fontFamily: "helvetica",
   tagline: "Mobilier & décoration haut de gamme",
+  brandName: "",
+  logoUrl: "",
 };
 
 export async function getTheme(shop) {
@@ -34,6 +36,8 @@ export async function saveTheme(shop, data) {
     lineColor: data.lineColor,
     fontFamily: FONT_FAMILIES[data.fontFamily] ? data.fontFamily : DEFAULTS.fontFamily,
     tagline: data.tagline || DEFAULTS.tagline,
+    brandName: data.brandName?.trim() || "",
+    logoUrl: data.logoUrl?.trim() || "",
   };
   return prisma.catalogueTheme.upsert({
     where: { shop },

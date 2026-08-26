@@ -74,7 +74,7 @@ function drawImageOrPlaceholder(doc, colors, imgPath, x, y, w, h) {
   doc.restore();
 }
 
-function drawCoverPage(doc, { colors, fonts, tagline }, { title, subtitle, coverImagePath }) {
+function drawCoverPage(doc, { colors, fonts, tagline, logoPath, brandName }, { title, subtitle, coverImagePath }) {
   const PAGE_W = doc.page.width;
   const PAGE_H = doc.page.height;
 
@@ -84,8 +84,12 @@ function drawCoverPage(doc, { colors, fonts, tagline }, { title, subtitle, cover
   const logoW = 170;
   const logoH = logoW * LOGO_ASPECT_RATIO;
   const logoY = 40;
-  if (fs.existsSync(LOGO_PATH)) {
-    doc.image(LOGO_PATH, (PAGE_W - logoW) / 2, logoY, { width: logoW });
+  const resolvedLogoPath = logoPath && fs.existsSync(logoPath) ? logoPath : !brandName ? LOGO_PATH : null;
+  if (resolvedLogoPath && fs.existsSync(resolvedLogoPath)) {
+    doc.image(resolvedLogoPath, (PAGE_W - logoW) / 2, logoY, { width: logoW });
+  } else if (brandName) {
+    doc.fontSize(24).fillColor(colors.darkBrown).font(fonts.bold)
+      .text(brandName, 0, logoY + 20, { align: "center" });
   }
 
   const imgX = 40, imgY = logoY + logoH + 25, imgW = PAGE_W - 80, imgH = 290;
@@ -137,12 +141,12 @@ function drawCategoryDividerPage(doc, { colors, fonts }, categoryTitle, imagePat
     .text(categoryTitle, 0, imgY + imgH + 55, { align: 'center' });
 }
 
-function footerText(collectionLabel) {
-  return `Homa Home — Catalogue ${collectionLabel}`;
+function footerText(brandName, collectionLabel) {
+  return `${brandName || "Homa Home"} — Catalogue ${collectionLabel}`;
 }
 
 /** Dessine les fiches produits (2 par page) pour une liste de produits, avec footer. */
-function drawProductPages(doc, { colors, fonts }, products, footerLabel, pageNumRef) {
+function drawProductPages(doc, { colors, fonts, brandName }, products, footerLabel, pageNumRef) {
   const PAGE_W = doc.page.width;
   const PAGE_H = doc.page.height;
 
@@ -227,7 +231,7 @@ function drawProductPages(doc, { colors, fonts }, products, footerLabel, pageNum
     if (products[i + 1]) drawCard(products[i + 1], pMargin + cardH + cardGap);
 
     doc.fontSize(9).fillColor(colors.taupe).font(fonts.regular)
-      .text(`${footerText(footerLabel)} — page ${pageNumRef.n}`, 0, PAGE_H - 30, { align: 'center' });
+      .text(`${footerText(brandName, footerLabel)} — page ${pageNumRef.n}`, 0, PAGE_H - 30, { align: 'center' });
     pageNumRef.n++;
   }
 }
@@ -243,6 +247,7 @@ function drawProductPages(doc, { colors, fonts }, products, footerLabel, pageNum
  */
 export function generateCatalogPDF({ outputPath, collectionMeta, products, coverImagePath, theme }) {
   const t = resolveTheme(theme);
+  const brandName = t.brandName || "Homa Home";
   const doc = new PDFDocument({ size: 'A4', margin: 0 });
   const stream = fs.createWriteStream(outputPath);
   const finished = new Promise((resolve, reject) => {
@@ -255,7 +260,7 @@ export function generateCatalogPDF({ outputPath, collectionMeta, products, cover
   doc.addPage();
 
   const presentationText =
-    "Homa Home est une maison de mobilier et de décoration haut de gamme, fabriquée en bois massif. " +
+    `${brandName} est une maison de mobilier et de décoration haut de gamme, fabriquée en bois massif. ` +
     "Nous proposons une sélection soignée de meubles, canapés, tables, buffets et chaises, pensés pour sublimer chaque intérieur.\n\n" +
     `Chaque pièce de notre catalogue est fabriquée sur commande (${DELAY_MSG.toLowerCase()}), garantissant ` +
     "un savoir-faire artisanal et une qualité durable. Nous livrons en Corse, en France et en Europe.\n\n" +
@@ -280,6 +285,7 @@ export function generateCatalogPDF({ outputPath, collectionMeta, products, cover
  */
 export function generateFullCatalogPDF({ outputPath, coverImagePath, sections, theme }) {
   const t = resolveTheme(theme);
+  const brandName = t.brandName || "Homa Home";
   const doc = new PDFDocument({ size: 'A4', margin: 0 });
   const stream = fs.createWriteStream(outputPath);
   const finished = new Promise((resolve, reject) => {
@@ -296,7 +302,7 @@ export function generateFullCatalogPDF({ outputPath, coverImagePath, sections, t
   doc.addPage();
 
   const presentationText =
-    "Homa Home est une maison de mobilier et de décoration haut de gamme, fabriquée en bois massif. " +
+    `${brandName} est une maison de mobilier et de décoration haut de gamme, fabriquée en bois massif. ` +
     "Nous proposons une sélection soignée de meubles, canapés, tables, buffets et chaises, pensés pour sublimer chaque intérieur.\n\n" +
     `Chaque pièce de notre catalogue est fabriquée sur commande (${DELAY_MSG.toLowerCase()}), garantissant ` +
     "un savoir-faire artisanal et une qualité durable. Nous livrons en Corse, en France et en Europe.\n\n" +

@@ -4,6 +4,7 @@ import PropTypes from "prop-types";
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getTheme, saveTheme, FONT_FAMILIES } from "../lib/theme.server";
+import { detectBrand } from "../lib/brand-detection.server";
 
 const buttonStyle = {
   display: "inline-block",
@@ -29,8 +30,11 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
+  if (formData.get("intent") === "detect-brand") {
+    return Response.json(await detectBrand(admin));
+  }
   await saveTheme(session.shop, {
     backgroundColor: formData.get("backgroundColor"),
     textColor: formData.get("textColor"),
@@ -39,6 +43,8 @@ export const action = async ({ request }) => {
     lineColor: formData.get("lineColor"),
     fontFamily: formData.get("fontFamily"),
     tagline: formData.get("tagline"),
+    brandName: formData.get("brandName"),
+    logoUrl: formData.get("logoUrl"),
   });
   return { ok: true };
 };
@@ -84,6 +90,8 @@ export default function SettingsPage() {
     lineColor: theme.lineColor,
     fontFamily: theme.fontFamily,
     tagline: theme.tagline,
+    brandName: theme.brandName,
+    logoUrl: theme.logoUrl,
   });
   const [saving, setSaving] = useState(false);
 
@@ -107,6 +115,29 @@ export default function SettingsPage() {
     }
   }
 
+  async function detectIdentity() {
+    setSaving(true);
+    try {
+      const body = new FormData();
+      body.set("intent", "detect-brand");
+      const res = await fetch("/app/settings", { method: "POST", body });
+      if (!res.ok) throw new Error(`Le serveur a répondu ${res.status}`);
+      const detected = await res.json();
+      setValues((prev) => ({
+        ...prev,
+        brandName: detected.name || prev.brandName,
+        logoUrl: detected.logoUrl || prev.logoUrl,
+      }));
+      if (detected.warning) shopify.toast.show(`Nom détecté. Logo indisponible : ${detected.warning}`, { isError: true });
+      else if (detected.logoUrl) shopify.toast.show("Identité détectée. Vérifie l'aperçu puis enregistre.");
+      else shopify.toast.show("Nom détecté, mais aucun logo fiable n'a été trouvé.");
+    } catch (err) {
+      shopify.toast.show(`Échec de l'analyse : ${err.message}`, { isError: true });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const fontLabel = fontOptions.find((f) => f.key === values.fontFamily)?.label || values.fontFamily;
 
   return (
@@ -117,6 +148,30 @@ export default function SettingsPage() {
           séparateurs de catégorie). Les valeurs actuelles correspondent à l&apos;identité Homa Home.
         </s-paragraph>
         <form onSubmit={handleSubmit}>
+          <div style={fieldRowStyle}>
+            <span style={labelStyle}>Identité de marque</span>
+            <button type="button" style={buttonStyle} onClick={detectIdentity} disabled={saving}>
+              Analyser automatiquement le site
+            </button>
+          </div>
+          <s-paragraph>
+            L&apos;analyse reprend le nom de la boutique puis cherche un logo dans l&apos;en-tête de la page d&apos;accueil.
+            Vérifie toujours le résultat avant de l&apos;enregistrer.
+          </s-paragraph>
+          <div style={fieldRowStyle}>
+            <label style={labelStyle} htmlFor="brandName">Nom de la marque</label>
+            <input id="brandName" name="brandName" value={values.brandName} onChange={(e) => set("brandName")(e.target.value)} style={textInputStyle} />
+          </div>
+          <div style={fieldRowStyle}>
+            <label style={labelStyle} htmlFor="logoUrl">URL du logo</label>
+            <input id="logoUrl" name="logoUrl" type="url" placeholder="https://…" value={values.logoUrl} onChange={(e) => set("logoUrl")(e.target.value)} style={textInputStyle} />
+          </div>
+          {values.logoUrl && (
+            <div style={{ ...fieldRowStyle, alignItems: "flex-start" }}>
+              <span style={labelStyle}>Aperçu du logo</span>
+              <img src={values.logoUrl} alt="Logo sélectionné" style={{ maxWidth: "180px", maxHeight: "70px", objectFit: "contain", border: "1px solid #D8CFC0", padding: "6px" }} />
+            </div>
+          )}
           <ColorField name="backgroundColor" label="Fond (couverture, séparateurs)" value={values.backgroundColor} onChange={set("backgroundColor")} />
           <ColorField name="textColor" label="Texte principal" value={values.textColor} onChange={set("textColor")} />
           <ColorField name="accentColor" label="Accent (prix, accroche)" value={values.accentColor} onChange={set("accentColor")} />

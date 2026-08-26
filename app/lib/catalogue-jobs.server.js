@@ -20,7 +20,8 @@ import { getTheme, FONT_FAMILIES } from "./theme.server";
 async function resolvePdfTheme(shop) {
   const theme = await getTheme(shop);
   const fonts = FONT_FAMILIES[theme.fontFamily] || FONT_FAMILIES.helvetica;
-  return { ...theme, fonts };
+  const logoPath = await downloadImage(theme.logoUrl, 500, 90);
+  return { ...theme, fonts, logoPath };
 }
 
 // Sur Render, CATALOGUE_STORAGE_DIR pointe vers le disque persistant (/data/catalogues)
