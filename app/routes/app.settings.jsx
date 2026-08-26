@@ -100,6 +100,9 @@ export default function SettingsPage() {
     mainMenuHandle: theme.mainMenuHandle,
   });
   const [saving, setSaving] = useState(false);
+  const [files, setFiles] = useState([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [filesError, setFilesError] = useState("");
 
   function set(field) {
     return (value) => setValues((prev) => ({ ...prev, [field]: value }));
@@ -146,6 +149,27 @@ export default function SettingsPage() {
     }
   }
 
+  async function loadFiles() {
+    setLoadingFiles(true);
+    setFilesError("");
+    try {
+      const res = await fetch("/app/files");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Le serveur a répondu ${res.status}`);
+      setFiles(data.files);
+    } catch (err) {
+      setFilesError(err.message);
+    } finally {
+      setLoadingFiles(false);
+    }
+  }
+
+  function selectLogo(file) {
+    set("logoUrl")(file.url);
+    setFiles([]);
+    shopify.toast.show("Logo sélectionné. Enregistre les réglages pour l’utiliser.");
+  }
+
   const headingFontLabel = fontOptions.find((f) => f.key === values.headingFontFamily)?.label || values.headingFontFamily;
   const bodyFontLabel = fontOptions.find((f) => f.key === values.bodyFontFamily)?.label || values.bodyFontFamily;
 
@@ -182,6 +206,36 @@ export default function SettingsPage() {
             <label style={labelStyle} htmlFor="logoUrl">URL du logo</label>
             <input id="logoUrl" name="logoUrl" type="url" placeholder="https://…" value={values.logoUrl} onChange={(e) => set("logoUrl")(e.target.value)} style={textInputStyle} />
           </div>
+          {!values.logoUrl && (
+            <div style={{ ...fieldRowStyle, alignItems: "flex-start" }}>
+              <span style={labelStyle}>Logo introuvable ?</span>
+              <div>
+                <button type="button" style={buttonStyle} onClick={loadFiles} disabled={loadingFiles}>
+                  {loadingFiles ? "Chargement…" : "Choisir dans Contenu > Fichiers"}
+                </button>
+                <div style={{ marginTop: "6px", fontSize: "12px", color: "#6B6259" }}>
+                  Sélectionne une image déjà présente dans les fichiers Shopify.
+                </div>
+                {filesError && <div style={{ marginTop: "6px", fontSize: "12px", color: "#A61B1B" }}>{filesError}</div>}
+                {files.length > 0 && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "10px", maxWidth: "620px", marginTop: "12px" }}>
+                    {files.map((file) => (
+                      <button
+                        type="button"
+                        key={file.id}
+                        onClick={() => selectLogo(file)}
+                        title={file.alt}
+                        style={{ border: "1px solid #D8CFC0", borderRadius: "4px", background: "white", padding: "6px", cursor: "pointer" }}
+                      >
+                        <img src={file.url} alt={file.alt} style={{ width: "100%", height: "72px", objectFit: "contain", display: "block" }} />
+                        <span style={{ display: "block", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px" }}>{file.alt}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {values.logoUrl && (
             <div style={{ ...fieldRowStyle, alignItems: "flex-start" }}>
               <span style={labelStyle}>Aperçu du logo</span>

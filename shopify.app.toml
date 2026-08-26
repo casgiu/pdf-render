@@ -6,8 +6,8 @@ embedded = true
 name = "FolioMise"
 
 [access_scopes]
-# Génération de catalogue = lecture seule (produits, collections, metafields).
-scopes = "read_products,read_online_store_navigation"
+# Génération de catalogue et choix d'un logo existant dans Contenu > Fichiers.
+scopes = "read_products,read_online_store_navigation,read_files"
 
 [webhooks]
 # Keep the configuration aligned with the stable Admin API version used by the app.

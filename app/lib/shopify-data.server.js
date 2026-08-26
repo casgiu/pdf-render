@@ -52,6 +52,40 @@ export async function listMenus(admin) {
   return data?.menus?.nodes || [];
 }
 
+/** Liste les images disponibles dans Shopify Admin > Contenu > Fichiers. */
+export async function listImageFiles(admin) {
+  const query = `#graphql
+    query ListImageFiles {
+      files(first: 100, query: "media_type:IMAGE") {
+        nodes {
+          ... on MediaImage {
+            id
+            alt
+            image {
+              url
+              width
+              height
+            }
+          }
+        }
+      }
+    }
+  `;
+  const response = await admin.graphql(query);
+  const { data, errors } = await response.json();
+  if (errors?.length) throw new Error(errors[0].message);
+
+  return (data?.files?.nodes || [])
+    .filter((file) => file?.image?.url)
+    .map((file) => ({
+      id: file.id,
+      alt: file.alt || "Image sans nom",
+      url: file.image.url,
+      width: file.image.width,
+      height: file.image.height,
+    }));
+}
+
 /**
  * Transforme le menu choisi en sections de catalogue. On ne conserve que les
  * entrées qui pointent vers des collections Shopify ; pages et liens externes
