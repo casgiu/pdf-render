@@ -1,63 +1,93 @@
 @AGENTS.md
 
-# État du projet — pdf-render (Homa Home)
+# Guide de maintenance — PDF Render
 
-App Shopify embarquée qui génère des catalogues PDF (et des flipbooks
-partageables) à partir des produits de la boutique. C'est la suite du
-script CLI original (`~/Downloads/homahome-catalogue-script`), transformé
-en vraie app Shopify pour être utilisable depuis l'admin plutôt qu'en
-ligne de commande sur un seul Mac.
+## Architecture actuelle
 
-## Infra / comptes
+L'application Shopify embarquée génère des catalogues PDF et des flipbooks à partir des produits de la boutique.
 
-- **Repo GitHub** : https://github.com/casgiu/pdf-render (public, branche `main`, déploiement auto sur push)
-- **Hébergement** : Render, service `pdf-render`, URL prod `https://pdf-render-015q.onrender.com`
-  - Déployé via Blueprint (`render.yaml`) — disque persistant `pdf-render-data` monté sur `/data`
-  - SQLite (sessions + jobs) : `/data/prod.sqlite`
-  - PDF/flipbooks générés : `/data/catalogues/`
-  - Variables d'env à vérifier si un déploiement échoue : `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `SHOPIFY_APP_URL`, `SCOPES=read_products`, `DATABASE_URL=file:/data/prod.sqlite`, `CATALOGUE_STORAGE_DIR=/data/catalogues`
-- **Shopify Partners** : organisation "Homa Home" (id `224684808`), app "pdf-render" (client_id `c1adf1bf6c6d3295c778c14b9345b327`)
-  - Récupérer le secret courant : `shopify app env show` depuis ce dossier
-  - Boutique de test créée pour le dev local : `test-gx8s8q1s.myshopify.com`
-  - Boutique réelle (cible finale) : `w2543v-77.myshopify.com` (alias affiché : homa-home-2)
-  - Distribution : `SingleMerchant` (app privée, pas d'App Store), scope unique `read_products`
+- **Web** : React Router sur Render.
+- **Base de données** : PostgreSQL Render pour les sessions Shopify, les réglages et les enregistrements `CatalogueJob`.
+- **File d'attente** : BullMQ sur Redis Render (`REDIS_URL`).
+- **Worker** : `app/worker.server.js`. Il récupère les produits via une session offline Shopify, génère les fichiers et les charge dans R2.
+- **Fichiers** : Cloudflare R2 ; aucun disque persistant Render n'est requis.
 
-## Comment relancer le dev local
+Pour limiter les coûts pendant les tests, le worker tourne actuellement dans le processus web si `RUN_WORKER_IN_WEB_PROCESS=true`. Plus tard, le démarrer dans un Background Worker Render via `npm run worker` et désactiver cette variable sur le service web.
+
+## Modules importants
+
+- `app/lib/catalogue-jobs.server.js` : création, statut, nettoyage et rétention des jobs.
+- `app/lib/job-queue.server.js` : file BullMQ et règles de retry.
+- `app/worker.server.js` : exécution et récupération des jobs interrompus.
+- `app/lib/object-storage.server.js` : accès Cloudflare R2 compatible S3.
+- `app/lib/shopify-data.server.js` : lecture collections, produits et métadonnées Shopify.
+- `app/lib/pdf.server.js` : rendu PDF avec pdfkit.
+- `app/lib/flipbook.server.js` : conversion PDF vers flipbook HTML.
+- `app/routes/app._index.jsx` : écran principal, lancement et historique.
+
+## Variables nécessaires
+
+```text
+SHOPIFY_API_KEY
+SHOPIFY_API_SECRET
+SHOPIFY_APP_URL
+SCOPES=read_products
+DATABASE_URL
+REDIS_URL
+OBJECT_STORAGE_ENDPOINT
+OBJECT_STORAGE_REGION=auto
+OBJECT_STORAGE_BUCKET
+OBJECT_STORAGE_ACCESS_KEY_ID
+OBJECT_STORAGE_SECRET_ACCESS_KEY
+RUN_WORKER_IN_WEB_PROCESS
+```
+
+Les groupes de variables Render doivent être explicitement liés au service. `render.yaml` décrit le service, mais il ne met pas automatiquement à jour un service Render déjà créé hors Blueprint.
+
+## Cycle de vie et rétention
+
+Un catalogue est soit global (`type=full`), soit associé à une collection. Une contrainte PostgreSQL empêche deux jobs actifs pour le même périmètre. Après une génération réussie, les anciens résultats terminés du même périmètre sont supprimés de PostgreSQL et de R2. Le nettoyage de l'historique élimine aussi les doublons créés avant cette règle.
+
+Objets R2 :
+
+```text
+catalogues/<shop>/<jobId>.pdf
+flipbooks/<shop>/<token>.html
+```
+
+Le résultat précédent n'est supprimé qu'après succès du nouveau : une erreur de génération ne supprime donc pas le dernier catalogue valide.
+
+Redis Free peut être vidé lors d'un redémarrage. Les jobs non terminés restent en base PostgreSQL et sont remis en file par le worker au démarrage.
+
+## Commandes
 
 ```bash
-cd ~/Downloads/pdf-render
-npm run dev   # = shopify app dev, ouvre un tunnel Cloudflare + preview URL
+npm run dev
+npm run build
+npm run start
+npm run worker
+npm run setup
+npm run lint
+npm run typecheck
 ```
-Nécessite d'être connecté au bon compte Shopify (`shopify auth login` déjà fait sur cette machine). Le CLI redemande parfois de choisir une boutique de dev.
 
-## Architecture
+## Pièges à préserver
 
-- `app/lib/shopify-data.server.js` — GraphQL (collections, produits, metafields → caractéristiques). Utilise `admin.graphql` (session authentifiée), pas de token client_credentials comme l'ancien script.
-- `app/lib/images.server.js` — téléchargement + compression JPEG (sharp) des photos produit.
-- `app/lib/pdf.server.js` — génération PDF (pdfkit), copié quasi tel quel du script CLI (`pdf.js`).
-- `app/lib/catalogue-jobs.server.js` — jobs de génération en tâche de fond (table Prisma `CatalogueJob`), pattern fire-and-forget : la route qui lance le job répond tout de suite, la génération continue côté serveur, l'UI fait du polling.
-- `app/lib/flipbook.server.js` — convertit un PDF déjà généré en flipbook HTML autonome (pdftoppm + page-flip, images en base64).
-- `app/routes/app._index.jsx` — page principale (liste collections, bouton catalogue complet, historique avec statuts + téléchargement + création de flipbook).
-- `app/routes/app.catalogue.start.jsx` / `status.$id.jsx` / `file.$id.jsx` / `flipbook.$id.jsx` — cycle de vie d'un job.
-- `app/routes/flipbook.$token.jsx` — page **publique** (pas d'auth Shopify) qui sert le flipbook généré.
+1. Les imports locaux du worker exécuté directement par Node doivent conserver leur extension `.js` dans la chaîne de modules concernée. Les retirer provoque `ERR_MODULE_NOT_FOUND` en production.
+2. Dans l'application Shopify embarquée, les téléchargements passent par `fetch()` puis `Blob` : une simple navigation vers un lien de fichier ne transporte pas nécessairement le jeton de session.
+3. Ne pas inclure `.env` dans l'image Docker ; des valeurs locales peuvent autrement écraser les variables Render.
+4. Les migrations de production sont appliquées avec `npx prisma migrate deploy`. Pour une migration nécessitant du SQL PostgreSQL spécifique, créer le dossier de migration et son `migration.sql` plutôt que d'utiliser une commande interactive en production.
+5. Les objets R2 doivent être privés : les routes authentifiées servent les PDF, tandis que les flipbooks publics utilisent un jeton non devinable.
 
-## Pièges déjà rencontrés (pour ne pas les refaire)
+## Vérifications minimales
 
-1. **Téléchargement de fichier dans une app embarquée** : une navigation `<a href>` classique ne passe PAS par le `fetch` patché par `AppProvider` (qui attache le token de session) → 401/bounce OAuth silencieux. Toujours télécharger via `fetch()` côté client + `Blob` + lien `download` synthétique (voir `downloadBlob` dans `app._index.jsx`).
-2. **`SHOPIFY_API_KEY` sur Render** doit être EXACTEMENT le client_id de `pdf-render` (`c1adf1bf6c6d3295c778c14b9345b327`). Un mauvais client_id fait planter l'auth avec un 401 sans message clair et redirige vers une autre app existante dans l'org.
-3. **`prisma migrate dev`** est interactif et échoue dans un terminal non-interactif dès qu'il y a un warning (ex: ajout de contrainte unique). Dans ce cas : écrire le SQL de migration à la main dans `prisma/migrations/<timestamp>_<nom>/migration.sql`, puis `npx prisma migrate deploy` (non-interactif).
-4. **`.env` doit être exclu du build Docker** (`.dockerignore`) sinon la valeur locale de `DATABASE_URL` écrase celle fournie par Render en prod → perte des sessions à chaque déploiement.
-5. **`render.yaml`** n'est appliqué automatiquement que via un déploiement "Blueprint" sur Render — un service créé à la main ignore ce fichier. Toute nouvelle variable d'env ajoutée au fichier doit être vérifiée/ajoutée manuellement dans le dashboard Render si le service existe déjà.
+Avant de pousser :
 
-## Statut
+```bash
+npm run lint
+npm run typecheck
+npm run build
+git diff --check
+```
 
-✅ App installée sur la vraie boutique `w2543v-77.myshopify.com` (homa-home-2).
-✅ Catalogue complet validé en conditions réelles (7 vraies catégories, tous les produits) : ~14 Mo, généré en tâche de fond sans timeout.
-✅ Flipbook validé en conditions réelles à partir de ce catalogue complet.
-
-Rien de bloquant en attente à ce stade — l'app est fonctionnelle de bout en bout.
-
-## Idées pour la suite (non commencées)
-
-- Rendre les 7 catégories du catalogue complet configurables depuis l'UI plutôt que codées en dur (`MAIN_MENU_CATEGORIES` dans `shopify-data.server.js`).
-- Nettoyage périodique des vieux PDF/flipbooks sur le disque (pas de purge automatique pour l'instant).
+Après un déploiement : vérifier un catalogue de collection, un catalogue complet, le téléchargement du PDF, un flipbook public, les logs du worker et les objets R2.
