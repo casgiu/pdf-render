@@ -33,7 +33,10 @@ export const action = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
   if (formData.get("intent") === "detect-brand") {
-    return Response.json(await detectBrand(admin));
+    // Comme les autres actions de l'app, on retourne une donnée React Router
+    // plutôt qu'une Response manuelle. Le fetch patché par App Bridge reçoit
+    // alors systématiquement le JSON sérialisé attendu côté navigateur.
+    return detectBrand(admin);
   }
   await saveTheme(session.shop, {
     backgroundColor: formData.get("backgroundColor"),
