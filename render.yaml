@@ -25,3 +25,15 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: OBJECT_STORAGE_ENDPOINT
+        sync: false
+      - key: OBJECT_STORAGE_REGION
+        value: auto
+      - key: OBJECT_STORAGE_BUCKET
+        value: pdf-render
+      - key: OBJECT_STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: OBJECT_STORAGE_SECRET_ACCESS_KEY
+        sync: false

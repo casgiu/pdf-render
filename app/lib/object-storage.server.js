@@ -2,10 +2,12 @@ import fs from "fs";
 import {
   GetObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   HeadBucketCommand,
-  PutObjectCommand,
+  ListObjectsV2Command,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 
 function required(name) {
   const value = process.env[name];
@@ -38,12 +40,18 @@ export async function checkObjectStorageHealth() {
 }
 
 export async function uploadFile(key, filePath, contentType) {
-  await getClient().send(new PutObjectCommand({
-    Bucket: bucket(),
-    Key: key,
-    Body: fs.createReadStream(filePath),
-    ContentType: contentType,
-  }));
+  // Upload choisit automatiquement le multipart pour les gros fichiers et
+  // annule les parties incomplètes en cas d'erreur.
+  await new Upload({
+    client: getClient(),
+    params: {
+      Bucket: bucket(),
+      Key: key,
+      Body: fs.createReadStream(filePath),
+      ContentType: contentType,
+    },
+    leavePartsOnError: false,
+  }).done();
 }
 
 export async function getObjectBuffer(key) {
@@ -60,4 +68,31 @@ export async function downloadObjectToFile(key, destination) {
 export async function deleteObject(key) {
   if (!key) return;
   await getClient().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
+}
+
+export async function listObjects(prefix) {
+  const objects = [];
+  let continuationToken;
+
+  do {
+    const page = await getClient().send(new ListObjectsV2Command({
+      Bucket: bucket(),
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+    }));
+    objects.push(...(page.Contents || []));
+    continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return objects;
+}
+
+export async function deleteObjects(keys) {
+  for (let index = 0; index < keys.length; index += 1000) {
+    const batch = keys.slice(index, index + 1000);
+    await getClient().send(new DeleteObjectsCommand({
+      Bucket: bucket(),
+      Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+    }));
+  }
 }

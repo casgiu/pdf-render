@@ -11,6 +11,7 @@
     "env": "shopify app env",
     "start": "react-router-serve ./build/server/index.js",
     "worker": "node scripts/worker.mjs",
+    "storage:reconcile": "node scripts/reconcile-object-storage.mjs",
     "docker-start": "npm run setup && sh -c 'if [ \"${RUN_WORKER_IN_WEB_PROCESS:-true}\" = \"true\" ]; then npm run worker & fi; exec npm run start'",
     "setup": "prisma generate && prisma migrate deploy",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
@@ -27,6 +28,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1118.0",
+    "@aws-sdk/lib-storage": "^3.1119.0",
     "@prisma/client": "^6.16.3",
     "@react-router/dev": "^7.12.0",
     "@react-router/fs-routes": "^7.12.0",

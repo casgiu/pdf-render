@@ -2,10 +2,13 @@ import { Worker } from "bullmq";
 import prisma from "./db.server.js";
 import { runFlipbookJob, runJob } from "./lib/catalogue-jobs.server.js";
 import { enqueueCatalogueJob, enqueueFlipbookJob, getQueueConnection, QUEUE_NAME } from "./lib/job-queue.server.js";
+import { reconcileObjectStorage } from "./lib/object-storage-reconciliation.server.js";
 import { unauthenticated } from "./shopify.server.js";
 import { logger, reportError } from "./lib/observability.server.js";
 
 let worker;
+let reconciliationTimer;
+const RECONCILIATION_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 async function processJob(queueJob) {
   const { jobId } = queueJob.data;
@@ -48,6 +51,27 @@ async function recoverIncompleteJobs() {
   if (jobs.length) logger.info("worker_incomplete_jobs_requeued", { count: jobs.length });
 }
 
+async function reconcileObjectStorageSafely() {
+  try {
+    const result = await reconcileObjectStorage();
+    logger.info("object_storage_reconciled", {
+      scannedCount: result.scannedCount,
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    reportError("object_storage_reconciliation_failed", error);
+  }
+}
+
+function scheduleObjectStorageReconciliation() {
+  if (reconciliationTimer) return;
+  void reconcileObjectStorageSafely();
+  reconciliationTimer = setInterval(() => {
+    void reconcileObjectStorageSafely();
+  }, RECONCILIATION_INTERVAL_MS);
+  reconciliationTimer.unref?.();
+}
+
 export async function startWorker() {
   if (worker) return worker;
 
@@ -60,6 +84,7 @@ export async function startWorker() {
   });
   worker.on("error", (error) => reportError("worker_redis_error", error));
   await recoverIncompleteJobs();
+  scheduleObjectStorageReconciliation();
   logger.info("worker_ready");
   return worker;
 }

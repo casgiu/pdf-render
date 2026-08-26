@@ -106,6 +106,11 @@ catalogues/<shop>/<jobId>.pdf
 flipbooks/<shop>/<token>.html
 ```
 
+Au démarrage puis toutes les 24 heures, le worker compare les objets R2 à
+PostgreSQL et supprime les objets non référencés depuis plus de 24 heures. La
+commande `npm run storage:reconcile -- --dry-run` permet de vérifier ce
+nettoyage sans rien supprimer.
+
 Quand une nouvelle génération réussit, elle remplace la précédente du même périmètre. L'ancien fichier reste disponible pendant la génération ; il est supprimé seulement après succès. L'historique est également nettoyé afin de ne conserver qu'un résultat final par collection, plus un catalogue complet.
 
 Redis Free peut perdre la file au redémarrage. Ce n'est pas une perte définitive : l'état des jobs reste dans PostgreSQL et le worker remet en file les jobs inachevés au démarrage.
