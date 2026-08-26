@@ -4,7 +4,6 @@ import PropTypes from "prop-types";
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getTheme, saveTheme, FONT_FAMILIES } from "../lib/theme.server";
-import { detectBrand } from "../lib/brand-detection.server";
 
 const buttonStyle = {
   display: "inline-block",
@@ -30,14 +29,8 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const formData = await request.formData();
-  if (formData.get("intent") === "detect-brand") {
-    // Comme les autres actions de l'app, on retourne une donnée React Router
-    // plutôt qu'une Response manuelle. Le fetch patché par App Bridge reçoit
-    // alors systématiquement le JSON sérialisé attendu côté navigateur.
-    return detectBrand(admin);
-  }
   await saveTheme(session.shop, {
     backgroundColor: formData.get("backgroundColor"),
     textColor: formData.get("textColor"),
@@ -121,11 +114,13 @@ export default function SettingsPage() {
   async function detectIdentity() {
     setSaving(true);
     try {
-      const body = new FormData();
-      body.set("intent", "detect-brand");
-      const res = await fetch("/app/settings", { method: "POST", body });
-      if (!res.ok) throw new Error(`Le serveur a répondu ${res.status}`);
+      const res = await fetch("/app/brand-detection", { method: "POST" });
+      const contentType = res.headers.get("Content-Type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Le serveur a renvoyé une réponse inattendue (${res.status}).`);
+      }
       const detected = await res.json();
+      if (!res.ok) throw new Error(detected.error || `Le serveur a répondu ${res.status}`);
       setValues((prev) => ({
         ...prev,
         brandName: detected.name || prev.brandName,
