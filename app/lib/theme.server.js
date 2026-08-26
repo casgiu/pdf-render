@@ -1,4 +1,4 @@
-import prisma from "../db.server";
+import prisma from "../db.server.js";
 
 // Familles de polices proposées dans les réglages. On se limite volontairement
 // aux polices standard PDF (base 14) : elles n'ont pas besoin d'être embarquées

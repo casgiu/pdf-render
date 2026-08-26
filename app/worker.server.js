@@ -1,8 +1,8 @@
 import { Worker } from "bullmq";
-import prisma from "./db.server";
-import { runFlipbookJob, runJob } from "./lib/catalogue-jobs.server";
-import { enqueueCatalogueJob, enqueueFlipbookJob, getQueueConnection, QUEUE_NAME } from "./lib/job-queue.server";
-import { unauthenticated } from "./shopify.server";
+import prisma from "./db.server.js";
+import { runFlipbookJob, runJob } from "./lib/catalogue-jobs.server.js";
+import { enqueueCatalogueJob, enqueueFlipbookJob, getQueueConnection, QUEUE_NAME } from "./lib/job-queue.server.js";
+import { unauthenticated } from "./shopify.server.js";
 
 let worker;
 

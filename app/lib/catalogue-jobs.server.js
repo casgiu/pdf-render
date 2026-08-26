@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
-import prisma from "../db.server";
+import prisma from "../db.server.js";
 import {
   listCollections,
   getMenuCollections,
@@ -10,13 +10,13 @@ import {
   truncateAtSentence,
   buildCharacteristics,
   MAIN_MENU_CATEGORIES,
-} from "./shopify-data.server";
+} from "./shopify-data.server.js";
 import crypto from "crypto";
-import { downloadImage } from "./images.server";
-import { generateCatalogPDF, generateFullCatalogPDF } from "./pdf.server";
-import { generateFlipbook } from "./flipbook.server";
-import { getTheme, FONT_FAMILIES } from "./theme.server";
-import { downloadObjectToFile, uploadFile } from "./object-storage.server";
+import { downloadImage } from "./images.server.js";
+import { generateCatalogPDF, generateFullCatalogPDF } from "./pdf.server.js";
+import { generateFlipbook } from "./flipbook.server.js";
+import { getTheme, FONT_FAMILIES } from "./theme.server.js";
+import { downloadObjectToFile, uploadFile } from "./object-storage.server.js";
 
 /** Réglages de thème (couleurs, accroche) + police résolue depuis sa clé, prêts pour pdf.server.js. */
 async function resolvePdfTheme(shop) {
