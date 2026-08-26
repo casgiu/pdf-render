@@ -135,11 +135,11 @@ export default function CataloguePage() {
       shopify.toast.show("Échec du lancement de la génération", { isError: true });
       return;
     }
-    const { jobId } = await res.json();
-    setJobs((prev) => [
-      { id: jobId, type, label, status: "pending", createdAt: new Date().toISOString() },
-      ...prev,
-    ]);
+    const { jobId, alreadyActive } = await res.json();
+    setJobs((prev) => prev.some((job) => job.id === jobId)
+      ? prev
+      : [{ id: jobId, type, label, status: "pending", createdAt: new Date().toISOString() }, ...prev]);
+    if (alreadyActive) shopify.toast.show("Une génération pour ce catalogue est déjà en cours.");
     startPolling(jobId);
   }
 

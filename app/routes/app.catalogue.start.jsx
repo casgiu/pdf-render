@@ -13,9 +13,9 @@ export const action = async ({ request }) => {
   const collectionId = formData.get("collectionId");
   const label = formData.get("label") || (type === "full" ? "Catalogue complet" : "Collection");
 
-  const job = await createJob({ shop: session.shop, type, label, collectionId: collectionId || null });
+  const { job, alreadyActive } = await createJob({ shop: session.shop, type, label, collectionId: collectionId || null });
 
-  await enqueueCatalogueJob(job.id);
+  if (!alreadyActive) await enqueueCatalogueJob(job.id);
 
-  return { jobId: job.id };
+  return { jobId: job.id, alreadyActive };
 };

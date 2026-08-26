@@ -16,7 +16,7 @@ import { downloadImage } from "./images.server.js";
 import { generateCatalogPDF, generateFullCatalogPDF } from "./pdf.server.js";
 import { generateFlipbook } from "./flipbook.server.js";
 import { getTheme, FONT_FAMILIES } from "./theme.server.js";
-import { downloadObjectToFile, uploadFile } from "./object-storage.server.js";
+import { deleteObject, downloadObjectToFile, uploadFile } from "./object-storage.server.js";
 
 /** Réglages de thème (couleurs, accroche) + police résolue depuis sa clé, prêts pour pdf.server.js. */
 async function resolvePdfTheme(shop) {
@@ -59,10 +59,28 @@ async function enrichProducts(products) {
 
 /** Crée un job "en attente" et retourne son id immédiatement (la génération se fait ailleurs, en tâche de fond). */
 export async function createJob({ shop, type, label, collectionId }) {
-  const job = await prisma.catalogueJob.create({
-    data: { shop, type, label, collectionId, status: "pending" },
-  });
-  return job;
+  const activeWhere = {
+    shop,
+    type,
+    collectionId: collectionId || null,
+    status: { in: ["pending", "running"] },
+  };
+  const activeJob = await prisma.catalogueJob.findFirst({ where: activeWhere });
+  if (activeJob) return { job: activeJob, alreadyActive: true };
+
+  try {
+    const job = await prisma.catalogueJob.create({
+      data: { shop, type, label, collectionId, status: "pending" },
+    });
+    return { job, alreadyActive: false };
+  } catch (error) {
+    // L'index partiel PostgreSQL protège aussi les doubles clics simultanés.
+    if (error.code === "P2002") {
+      const concurrentJob = await prisma.catalogueJob.findFirst({ where: activeWhere });
+      if (concurrentJob) return { job: concurrentJob, alreadyActive: true };
+    }
+    throw error;
+  }
 }
 
 export async function getJob(id, shop) {
@@ -75,6 +93,21 @@ export async function listRecentJobs(shop, limit = 15) {
     orderBy: { createdAt: "desc" },
     take: limit,
   });
+}
+
+async function removeSupersededJobs(currentJob) {
+  const scope = currentJob.type === "full"
+    ? { shop: currentJob.shop, type: "full" }
+    : { shop: currentJob.shop, type: "collection", collectionId: currentJob.collectionId };
+  const previousJobs = await prisma.catalogueJob.findMany({
+    where: { ...scope, id: { not: currentJob.id }, status: { in: ["done", "error"] } },
+  });
+
+  for (const previousJob of previousJobs) {
+    await deleteObject(previousJob.fileKey);
+    await deleteObject(previousJob.flipbookKey);
+    await prisma.catalogueJob.delete({ where: { id: previousJob.id } });
+  }
 }
 
 /**
@@ -131,6 +164,9 @@ export async function runJob(jobId, admin) {
     await prisma.catalogueJob.update({
       where: { id: jobId },
       data: { status: "done", fileKey, filePath: null, fileName, completedAt: new Date() },
+    });
+    await removeSupersededJobs(job).catch((cleanupError) => {
+      console.error(`[catalogue-job ${jobId}] suppression des anciens catalogues impossible :`, cleanupError);
     });
     await fs.promises.rm(outputPath, { force: true }).catch((cleanupError) => {
       console.warn(`[catalogue-job ${jobId}] nettoyage du PDF temporaire impossible :`, cleanupError);

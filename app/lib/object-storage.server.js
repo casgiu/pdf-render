@@ -1,6 +1,7 @@
 import fs from "fs";
 import {
   GetObjectCommand,
+  DeleteObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -49,4 +50,9 @@ export async function getObjectBuffer(key) {
 export async function downloadObjectToFile(key, destination) {
   const buffer = await getObjectBuffer(key);
   await fs.promises.writeFile(destination, buffer);
+}
+
+export async function deleteObject(key) {
+  if (!key) return;
+  await getClient().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
 }
