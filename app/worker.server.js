@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import prisma from "./db.server.js";
-import { runFlipbookJob, runJob } from "./lib/catalogue-jobs.server.js";
+import { pruneExistingDuplicates, runFlipbookJob, runJob } from "./lib/catalogue-jobs.server.js";
 import { enqueueCatalogueJob, enqueueFlipbookJob, getQueueConnection, QUEUE_NAME } from "./lib/job-queue.server.js";
 import { reconcileObjectStorage } from "./lib/object-storage-reconciliation.server.js";
 import { unauthenticated } from "./shopify.server.js";
@@ -32,6 +32,8 @@ async function processJob(queueJob) {
 }
 
 async function recoverIncompleteJobs() {
+  const shops = await prisma.catalogueJob.findMany({ distinct: ["shop"], select: { shop: true } });
+  await Promise.all(shops.map(({ shop }) => pruneExistingDuplicates(shop)));
   const jobs = await prisma.catalogueJob.findMany({
     where: {
       OR: [

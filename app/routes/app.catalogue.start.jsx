@@ -1,5 +1,6 @@
 import { authenticate } from "../shopify.server";
 import { createJob } from "../lib/catalogue-jobs.server";
+import { parseCatalogueJobInput } from "../lib/job-input.server";
 import { enqueueCatalogueJob } from "../lib/job-queue.server";
 
 // Démarre une génération de catalogue en tâche de fond et répond tout de
@@ -9,11 +10,10 @@ import { enqueueCatalogueJob } from "../lib/job-queue.server";
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const formData = await request.formData();
-  const type = formData.get("type");
-  const collectionId = formData.get("collectionId");
-  const label = formData.get("label") || (type === "full" ? "Catalogue complet" : "Collection");
+  const input = parseCatalogueJobInput(formData);
+  if (input.error) return Response.json({ error: input.error }, { status: 400 });
 
-  const { job, alreadyActive } = await createJob({ shop: session.shop, type, label, collectionId: collectionId || null });
+  const { job, alreadyActive } = await createJob({ shop: session.shop, ...input });
 
   if (!alreadyActive) await enqueueCatalogueJob(job.id);
 

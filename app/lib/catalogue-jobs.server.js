@@ -31,6 +31,7 @@ async function resolvePdfTheme(shop) {
 // temporaires nécessaires à pdfkit et pdftoppm.
 const STORAGE_DIR = path.join(os.tmpdir(), "pdf-render-catalogues");
 if (!fs.existsSync(STORAGE_DIR)) fs.mkdirSync(STORAGE_DIR, { recursive: true });
+const IMAGE_DOWNLOAD_CONCURRENCY = 8;
 
 function slugify(text) {
   return text
@@ -42,19 +43,27 @@ function slugify(text) {
 }
 
 async function enrichProducts(products) {
-  const enriched = [];
-  for (const p of products) {
+  const enriched = new Array(products.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < products.length) {
+      const index = nextIndex++;
+      const p = products[index];
     const url = p.featuredMedia?.preview?.image?.url || null;
     const localImagePath = await downloadImage(url);
-    enriched.push({
+      enriched[index] = {
       title: p.title,
       descriptionPlain: truncateAtSentence(stripHtml(p.descriptionHtml), 80),
       priceRangeV2: p.priceRangeV2,
       variants: p.variants.edges.map((e) => e.node),
       characteristics: buildCharacteristics(p.metafields.edges.map((e) => e.node)),
       localImagePath,
-    });
+      };
+    }
   }
+
+  await Promise.all(Array.from({ length: Math.min(IMAGE_DOWNLOAD_CONCURRENCY, products.length) }, worker));
   return enriched;
 }
 
@@ -102,7 +111,6 @@ export function isFlipbookPublic(job) {
 }
 
 export async function listRecentJobs(shop, limit = 15) {
-  await pruneExistingDuplicates(shop);
   return prisma.catalogueJob.findMany({
     where: { shop },
     orderBy: { createdAt: "desc" },
@@ -127,7 +135,7 @@ async function removeJobAndAssets(job) {
   await prisma.catalogueJob.delete({ where: { id: job.id } });
 }
 
-async function pruneExistingDuplicates(shop) {
+export async function pruneExistingDuplicates(shop) {
   const jobs = await prisma.catalogueJob.findMany({
     where: { shop },
     orderBy: { createdAt: "desc" },
@@ -167,11 +175,12 @@ async function pruneExistingDuplicates(shop) {
  * puis relance l'erreur afin que BullMQ puisse réessayer le job.
  */
 export async function runJob(jobId, admin) {
+  let outputPath;
   await prisma.catalogueJob.update({ where: { id: jobId }, data: { status: "running" } });
 
   try {
     const job = await prisma.catalogueJob.findUniqueOrThrow({ where: { id: jobId } });
-    const outputPath = path.join(STORAGE_DIR, `${jobId}.pdf`);
+    outputPath = path.join(STORAGE_DIR, `${jobId}.pdf`);
     const theme = await resolvePdfTheme(job.shop);
 
     let fileName;
@@ -218,9 +227,6 @@ export async function runJob(jobId, admin) {
     await removeSupersededJobs(job).catch((cleanupError) => {
       logger.error("catalogue_cleanup_failed", cleanupError, { jobId });
     });
-    await fs.promises.rm(outputPath, { force: true }).catch((cleanupError) => {
-      logger.warn("catalogue_temporary_file_cleanup_failed", { jobId, error: cleanupError.message });
-    });
   } catch (err) {
     reportError("catalogue_job_failed", err, { jobId });
     await prisma.catalogueJob.update({
@@ -228,6 +234,12 @@ export async function runJob(jobId, admin) {
       data: { status: "error", errorMessage: err.message?.slice(0, 500) || "Erreur inconnue", completedAt: new Date() },
     });
     throw err;
+  } finally {
+    if (outputPath) {
+      await fs.promises.rm(outputPath, { force: true }).catch((cleanupError) => {
+        logger.warn("catalogue_temporary_file_cleanup_failed", { jobId, error: cleanupError.message });
+      });
+    }
   }
 }
 
@@ -236,6 +248,8 @@ export async function runJob(jobId, admin) {
  * terminé. Elle est exécutée et relancée par le worker BullMQ.
  */
 export async function runFlipbookJob(jobId) {
+  let temporaryPdfPath;
+  let outputHtmlPath;
   await prisma.catalogueJob.update({ where: { id: jobId }, data: { flipbookStatus: "running" } });
 
   try {
@@ -248,7 +262,8 @@ export async function runFlipbookJob(jobId) {
     const localPdfPath = job.fileKey
       ? path.join(STORAGE_DIR, `${jobId}-flipbook.pdf`)
       : job.filePath;
-    const outputHtmlPath = path.join(STORAGE_DIR, "flipbooks", `${token}.html`);
+    temporaryPdfPath = job.fileKey ? localPdfPath : null;
+    outputHtmlPath = path.join(STORAGE_DIR, "flipbooks", `${token}.html`);
     if (job.fileKey) await downloadObjectToFile(job.fileKey, localPdfPath);
     await generateFlipbook(localPdfPath, job.label, outputHtmlPath);
     const flipbookKey = `flipbooks/${job.shop}/${token}.html`;
@@ -265,14 +280,6 @@ export async function runFlipbookJob(jobId) {
       },
     });
     if (job.flipbookKey && job.flipbookKey !== flipbookKey) await deleteObject(job.flipbookKey);
-    if (job.fileKey) {
-      await fs.promises.rm(localPdfPath, { force: true }).catch((cleanupError) => {
-        logger.warn("flipbook_temporary_pdf_cleanup_failed", { jobId, error: cleanupError.message });
-      });
-    }
-    await fs.promises.rm(outputHtmlPath, { force: true }).catch((cleanupError) => {
-      logger.warn("flipbook_temporary_html_cleanup_failed", { jobId, error: cleanupError.message });
-    });
   } catch (err) {
     reportError("flipbook_job_failed", err, { jobId });
     await prisma.catalogueJob.update({
@@ -280,6 +287,17 @@ export async function runFlipbookJob(jobId) {
       data: { flipbookStatus: "error", flipbookError: err.message?.slice(0, 500) || "Erreur inconnue" },
     });
     throw err;
+  } finally {
+    if (temporaryPdfPath) {
+      await fs.promises.rm(temporaryPdfPath, { force: true }).catch((cleanupError) => {
+        logger.warn("flipbook_temporary_pdf_cleanup_failed", { jobId, error: cleanupError.message });
+      });
+    }
+    if (outputHtmlPath) {
+      await fs.promises.rm(outputHtmlPath, { force: true }).catch((cleanupError) => {
+        logger.warn("flipbook_temporary_html_cleanup_failed", { jobId, error: cleanupError.message });
+      });
+    }
   }
 }
 

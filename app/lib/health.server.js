@@ -11,7 +11,6 @@ async function check(operation) {
     return {
       status: "error",
       latencyMs: Math.round(performance.now() - startedAt),
-      error: error instanceof Error ? error.message : "Erreur inconnue",
     };
   }
 }

@@ -1,4 +1,5 @@
 import fs from "fs";
+import { pipeline } from "stream/promises";
 import {
   GetObjectCommand,
   DeleteObjectCommand,
@@ -55,14 +56,18 @@ export async function uploadFile(key, filePath, contentType) {
 }
 
 export async function getObjectBuffer(key) {
+  const body = await getObjectStream(key);
+  return Buffer.from(await body.transformToByteArray());
+}
+
+export async function getObjectStream(key) {
   const response = await getClient().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
   if (!response.Body) throw new Error("Le stockage objet a retourné un fichier vide.");
-  return Buffer.from(await response.Body.transformToByteArray());
+  return response.Body;
 }
 
 export async function downloadObjectToFile(key, destination) {
-  const buffer = await getObjectBuffer(key);
-  await fs.promises.writeFile(destination, buffer);
+  await pipeline(await getObjectStream(key), fs.createWriteStream(destination));
 }
 
 export async function deleteObject(key) {

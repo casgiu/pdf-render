@@ -8,6 +8,15 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PAGE_FLIP_BUNDLE_PATH = path.join(__dirname, "..", "..", "node_modules", "page-flip", "dist", "js", "page-flip.browser.js");
 
+export function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /** Convertit chaque page du PDF en JPEG via pdftoppm (poppler), dans un dossier temporaire dédié. */
 function renderPdfPagesToJpegs(pdfPath) {
   const tmpDir = path.join(os.tmpdir(), `flipbook-render-${crypto.randomUUID()}`);
@@ -39,12 +48,13 @@ function renderPdfPagesToJpegs(pdfPath) {
 function buildFlipbookHtml(title, pageDataUris) {
   const bundle = fs.readFileSync(PAGE_FLIP_BUNDLE_PATH, "utf8");
   const pagesJson = JSON.stringify(pageDataUris);
+  const safeTitle = escapeHtml(title);
 
   return `<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>${title}</title>
+<title>${safeTitle}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root { --cream:#F5F1EA; --brown:#3B2E24; --gold:#B08D57; }
@@ -61,7 +71,7 @@ function buildFlipbookHtml(title, pageDataUris) {
 </style>
 </head>
 <body>
-<h1>${title}</h1>
+<h1>${safeTitle}</h1>
 <div id="flipbook"></div>
 <div class="controls">
   <button id="prevBtn">‹ Précédent</button>

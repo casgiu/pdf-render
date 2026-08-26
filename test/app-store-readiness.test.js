@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { isOnboardingComplete } from "../app/lib/theme.server.js";
 import { isFlipbookPublic } from "../app/lib/catalogue-jobs.server.js";
 import { purgeShopData } from "../app/lib/shop-data-purge.server.js";
+import { parseCatalogueJobInput } from "../app/lib/job-input.server.js";
+import { escapeHtml } from "../app/lib/flipbook.server.js";
 
 test("l’onboarding exige une marque et un menu", () => {
   assert.equal(isOnboardingComplete({ brandName: "Atelier", mainMenuHandle: "principal" }), true);
@@ -12,6 +14,30 @@ test("l’onboarding exige une marque et un menu", () => {
 test("un flipbook révoqué n’est jamais public", () => {
   assert.equal(isFlipbookPublic({ flipbookStatus: "done", flipbookPublished: true }), true);
   assert.equal(isFlipbookPublic({ flipbookStatus: "done", flipbookPublished: false }), false);
+});
+
+test("le titre du flipbook est échappé avant insertion dans le HTML", () => {
+  assert.equal(escapeHtml('<img src=x onerror="alert(1)">'), "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+});
+
+test("la création de catalogue refuse les données incohérentes", () => {
+  const formData = (entries) => {
+    const data = new FormData();
+    entries.forEach(([key, value]) => data.append(key, value));
+    return data;
+  };
+
+  assert.deepEqual(parseCatalogueJobInput(formData([["type", "unknown"]])), {
+    error: "Le type de catalogue est invalide.",
+  });
+  assert.deepEqual(parseCatalogueJobInput(formData([["type", "collection"]])), {
+    error: "Une collection est requise.",
+  });
+  assert.deepEqual(parseCatalogueJobInput(formData([["type", "full"], ["label", "  Mon catalogue  "]])), {
+    type: "full",
+    collectionId: null,
+    label: "Mon catalogue",
+  });
 });
 
 test("l’effacement boutique retire les objets, tâches et lignes persistées", async () => {

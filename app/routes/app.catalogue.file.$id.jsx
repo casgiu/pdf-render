@@ -1,7 +1,8 @@
 import fs from "fs";
+import { Readable } from "stream";
 import { authenticate } from "../shopify.server";
 import { getJob } from "../lib/catalogue-jobs.server";
-import { getObjectBuffer } from "../lib/object-storage.server";
+import { getObjectStream } from "../lib/object-storage.server";
 
 // Sert le PDF d'un job terminé. Le fichier reste sur le disque persistant
 // (contrairement à l'ancienne version synchrone qui le supprimait après
@@ -14,13 +15,13 @@ export const loader = async ({ request, params }) => {
     throw new Response("Catalogue introuvable ou pas encore prêt.", { status: 404 });
   }
 
-  const buffer = job.fileKey
-    ? await getObjectBuffer(job.fileKey)
+  const body = job.fileKey
+    ? Readable.toWeb(await getObjectStream(job.fileKey))
     : job.filePath && fs.existsSync(job.filePath)
       ? fs.readFileSync(job.filePath)
       : null;
-  if (!buffer) throw new Response("Catalogue introuvable ou pas encore prêt.", { status: 404 });
-  return new Response(buffer, {
+  if (!body) throw new Response("Catalogue introuvable ou pas encore prêt.", { status: 404 });
+  return new Response(body, {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${job.fileName}"`,
