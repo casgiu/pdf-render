@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { listCollections } from "../lib/shopify-data.server";
@@ -60,20 +61,22 @@ async function downloadBlob(url, fallbackName) {
   URL.revokeObjectURL(blobUrl);
 }
 
-export default function CataloguePage({ loaderData }) {
+export default function CataloguePage() {
+  const loaderData = useLoaderData();
   const { collections } = loaderData;
   const shopify = useAppBridge();
   const [jobs, setJobs] = useState(loaderData.jobs);
   const pollTimers = useRef({});
 
   useEffect(() => {
+    const timers = pollTimers.current;
     // Reprend le suivi des jobs encore en cours au chargement de la page
     // (ex: on a relancé un catalogue complet puis fermé/rouvert l'app).
     for (const job of loaderData.jobs) {
       if (job.status === "pending" || job.status === "running") startPolling(job.id);
     }
     return () => {
-      Object.values(pollTimers.current).forEach(clearInterval);
+      Object.values(timers).forEach(clearInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -165,7 +168,7 @@ export default function CataloguePage({ loaderData }) {
           catégories du menu principal (Salons, Salle à manger, Chambres,
           Luminaires, Professionnels, Extérieur, Décorations). La génération
           se fait en arrière-plan : tu peux fermer cette page, le catalogue
-          apparaîtra dans l'historique une fois prêt.
+          apparaîtra dans l&apos;historique une fois prêt.
         </s-paragraph>
         <button
           type="button"
@@ -206,7 +209,7 @@ export default function CataloguePage({ loaderData }) {
 
       <s-section heading="Historique">
         {jobs.length === 0 ? (
-          <s-paragraph>Aucun catalogue généré pour l'instant.</s-paragraph>
+          <s-paragraph>Aucun catalogue généré pour l&apos;instant.</s-paragraph>
         ) : (
           <s-table>
             <s-table-header-row>

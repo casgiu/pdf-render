@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
+import PropTypes from "prop-types";
+import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getTheme, saveTheme, FONT_FAMILIES } from "../lib/theme.server";
 
@@ -63,7 +65,15 @@ function ColorField({ name, label, value, onChange }) {
   );
 }
 
-export default function SettingsPage({ loaderData }) {
+ColorField.propTypes = {
+  name: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  value: PropTypes.string.isRequired,
+  onChange: PropTypes.func.isRequired,
+};
+
+export default function SettingsPage() {
+  const loaderData = useLoaderData();
   const { theme, fontOptions } = loaderData;
   const shopify = useAppBridge();
   const [values, setValues] = useState({
@@ -104,7 +114,7 @@ export default function SettingsPage({ loaderData }) {
       <s-section heading="Couleurs">
         <s-paragraph>
           Ces couleurs sont utilisées sur toutes les pages du catalogue (couverture, fiches produit,
-          séparateurs de catégorie). Les valeurs actuelles correspondent à l'identité Homa Home.
+          séparateurs de catégorie). Les valeurs actuelles correspondent à l&apos;identité Homa Home.
         </s-paragraph>
         <form onSubmit={handleSubmit}>
           <ColorField name="backgroundColor" label="Fond (couverture, séparateurs)" value={values.backgroundColor} onChange={set("backgroundColor")} />
