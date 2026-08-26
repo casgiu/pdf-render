@@ -3,6 +3,7 @@ import prisma from "./db.server.js";
 import { runFlipbookJob, runJob } from "./lib/catalogue-jobs.server.js";
 import { enqueueCatalogueJob, enqueueFlipbookJob, getQueueConnection, QUEUE_NAME } from "./lib/job-queue.server.js";
 import { unauthenticated } from "./shopify.server.js";
+import { logger, reportError } from "./lib/observability.server.js";
 
 let worker;
 
@@ -44,7 +45,7 @@ async function recoverIncompleteJobs() {
     }
   }
 
-  if (jobs.length) console.log(`[worker] ${jobs.length} job(s) incomplet(s) remis en file.`);
+  if (jobs.length) logger.info("worker_incomplete_jobs_requeued", { count: jobs.length });
 }
 
 export async function startWorker() {
@@ -55,10 +56,10 @@ export async function startWorker() {
     concurrency: 1,
   });
   worker.on("failed", (job, error) => {
-    console.error(`[worker] job ${job?.id ?? "inconnu"} en échec :`, error);
+    reportError("worker_job_failed", error, { queueJobId: job?.id ?? "unknown", jobType: job?.name ?? "unknown" });
   });
-  worker.on("error", (error) => console.error("[worker] erreur Redis :", error));
+  worker.on("error", (error) => reportError("worker_redis_error", error));
   await recoverIncompleteJobs();
-  console.log("[worker] prêt.");
+  logger.info("worker_ready");
   return worker;
 }

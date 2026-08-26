@@ -17,6 +17,7 @@ import { generateCatalogPDF, generateFullCatalogPDF } from "./pdf.server.js";
 import { generateFlipbook } from "./flipbook.server.js";
 import { getTheme, FONT_FAMILIES } from "./theme.server.js";
 import { deleteObject, downloadObjectToFile, uploadFile } from "./object-storage.server.js";
+import { logger, reportError } from "./observability.server.js";
 
 /** Réglages de thème (couleurs, accroche) + police résolue depuis sa clé, prêts pour pdf.server.js. */
 async function resolvePdfTheme(shop) {
@@ -203,13 +204,13 @@ export async function runJob(jobId, admin) {
       data: { status: "done", fileKey, filePath: null, fileName, completedAt: new Date() },
     });
     await removeSupersededJobs(job).catch((cleanupError) => {
-      console.error(`[catalogue-job ${jobId}] suppression des anciens catalogues impossible :`, cleanupError);
+      logger.error("catalogue_cleanup_failed", cleanupError, { jobId });
     });
     await fs.promises.rm(outputPath, { force: true }).catch((cleanupError) => {
-      console.warn(`[catalogue-job ${jobId}] nettoyage du PDF temporaire impossible :`, cleanupError);
+      logger.warn("catalogue_temporary_file_cleanup_failed", { jobId, error: cleanupError.message });
     });
   } catch (err) {
-    console.error(`[catalogue-job ${jobId}] échec :`, err);
+    reportError("catalogue_job_failed", err, { jobId });
     await prisma.catalogueJob.update({
       where: { id: jobId },
       data: { status: "error", errorMessage: err.message?.slice(0, 500) || "Erreur inconnue", completedAt: new Date() },
@@ -247,14 +248,14 @@ export async function runFlipbookJob(jobId) {
     });
     if (job.fileKey) {
       await fs.promises.rm(localPdfPath, { force: true }).catch((cleanupError) => {
-        console.warn(`[flipbook-job ${jobId}] nettoyage du PDF temporaire impossible :`, cleanupError);
+        logger.warn("flipbook_temporary_pdf_cleanup_failed", { jobId, error: cleanupError.message });
       });
     }
     await fs.promises.rm(outputHtmlPath, { force: true }).catch((cleanupError) => {
-      console.warn(`[flipbook-job ${jobId}] nettoyage du HTML temporaire impossible :`, cleanupError);
+      logger.warn("flipbook_temporary_html_cleanup_failed", { jobId, error: cleanupError.message });
     });
   } catch (err) {
-    console.error(`[flipbook-job ${jobId}] échec :`, err);
+    reportError("flipbook_job_failed", err, { jobId });
     await prisma.catalogueJob.update({
       where: { id: jobId },
       data: { flipbookStatus: "error", flipbookError: err.message?.slice(0, 500) || "Erreur inconnue" },

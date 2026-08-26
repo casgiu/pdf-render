@@ -65,6 +65,9 @@ OBJECT_STORAGE_SECRET_ACCESS_KEY=
 
 # true par défaut : utile tant que le worker tourne dans le service web
 RUN_WORKER_IN_WEB_PROCESS=true
+
+# Observabilité (optionnel) : URL de webhook compatible Slack pour les erreurs critiques.
+ERROR_ALERT_WEBHOOK_URL=
 ```
 
 En production, `DATABASE_URL` doit pointer vers l'URL interne PostgreSQL de Render. Les variables R2 et Redis sont fournies via les groupes de variables liés au service Render.
@@ -110,8 +113,15 @@ npm run build
 
 Après le déploiement, vérifier la création d'un catalogue, son téléchargement, la création d'un flipbook et la présence des fichiers correspondants dans R2.
 
+Le point d'entrée public `GET /health` vérifie PostgreSQL, Redis et R2. Il retourne
+`200` quand tout est disponible ou `503` avec le détail non sensible de la dépendance
+en erreur. Il est déjà déclaré comme health check dans `render.yaml`. Les logs sont
+émis au format JSON (faciles à filtrer dans Render) ; renseignez
+`ERROR_ALERT_WEBHOOK_URL` avec un webhook compatible Slack pour recevoir les échecs
+de jobs, de Redis et de rendu. Les alertes identiques sont regroupées sur cinq minutes.
+
 ## Prochaines améliorations techniques
 
 - Exécuter le worker dans un service Render dédié.
 - Passer l'image Docker à Node.js 22 avant janvier 2027 (AWS SDK v3 cessera alors de prendre en charge Node.js 20).
-- Ajouter des métriques, alertes et une politique R2 de nettoyage des objets orphelins.
+- Ajouter des métriques et une politique R2 de nettoyage des objets orphelins.

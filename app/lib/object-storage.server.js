@@ -2,6 +2,7 @@ import fs from "fs";
 import {
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadBucketCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -30,6 +31,10 @@ function getClient() {
 
 function bucket() {
   return required("OBJECT_STORAGE_BUCKET");
+}
+
+export async function checkObjectStorageHealth() {
+  await getClient().send(new HeadBucketCommand({ Bucket: bucket() }));
 }
 
 export async function uploadFile(key, filePath, contentType) {

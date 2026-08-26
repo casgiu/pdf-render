@@ -5,6 +5,7 @@ services:
     plan: starter
     region: frankfurt
     autoDeployTrigger: commit
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production

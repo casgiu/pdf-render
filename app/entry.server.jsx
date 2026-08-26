@@ -4,6 +4,7 @@ import { ServerRouter } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
+import { reportError } from "./lib/observability.server.js";
 
 export const streamTimeout = 5000;
 
@@ -39,7 +40,7 @@ export default async function handleRequest(
         },
         onError(error) {
           responseStatusCode = 500;
-          console.error(error);
+          reportError("server_render_failed", error, { url: request.url });
         },
       },
     );
