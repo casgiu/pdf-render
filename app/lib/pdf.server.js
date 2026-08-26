@@ -33,7 +33,23 @@ function resolveTheme(theme) {
     },
     fonts: theme?.fonts || DEFAULT_FONTS,
     tagline: theme?.tagline || DEFAULT_TAGLINE,
+    presentationText: theme?.presentationText?.trim() || '',
   };
+}
+
+function defaultPresentationText({ brandName, collectionTitle }) {
+  const collectionSentence = collectionTitle
+    ? `Ce catalogue présente notre sélection ${collectionTitle.toLowerCase()}.`
+    : "Ce catalogue présente l'ensemble de notre collection, organisée par catégorie.";
+  return `${brandName} est une maison de mobilier et de décoration haut de gamme, fabriquée en bois massif. ` +
+    "Nous proposons une sélection soignée de meubles, canapés, tables, buffets et chaises, pensés pour sublimer chaque intérieur.\n\n" +
+    `Chaque pièce de notre catalogue est fabriquée sur commande (${DELAY_MSG.toLowerCase()}), garantissant ` +
+    "un savoir-faire artisanal et une qualité durable. Nous livrons en Corse, en France et en Europe.\n\n" +
+    `${collectionSentence} Chaque fiche produit détaille le prix et les dimensions disponibles.`;
+}
+
+function presentationTextFor(theme, context) {
+  return theme.presentationText || defaultPresentationText(context);
 }
 
 const DELAY_MSG = 'En commande sous 20 à 24 semaines';
@@ -259,13 +275,7 @@ export function generateCatalogPDF({ outputPath, collectionMeta, products, cover
   drawCoverPage(doc, t, { title: `Catalogue — ${collectionMeta.title}`, coverImagePath });
   doc.addPage();
 
-  const presentationText =
-    `${brandName} est une maison de mobilier et de décoration haut de gamme, fabriquée en bois massif. ` +
-    "Nous proposons une sélection soignée de meubles, canapés, tables, buffets et chaises, pensés pour sublimer chaque intérieur.\n\n" +
-    `Chaque pièce de notre catalogue est fabriquée sur commande (${DELAY_MSG.toLowerCase()}), garantissant ` +
-    "un savoir-faire artisanal et une qualité durable. Nous livrons en Corse, en France et en Europe.\n\n" +
-    `Ce catalogue présente notre sélection ${collectionMeta.title.toLowerCase()}. Chaque fiche produit détaille ` +
-    "le prix et les dimensions disponibles.";
+  const presentationText = presentationTextFor(t, { brandName, collectionTitle: collectionMeta.title });
   drawPresentationPage(doc, t, presentationText);
 
   drawProductPages(doc, t, products, collectionMeta.title, { n: 1 });
@@ -301,13 +311,7 @@ export function generateFullCatalogPDF({ outputPath, coverImagePath, sections, t
   });
   doc.addPage();
 
-  const presentationText =
-    `${brandName} est une maison de mobilier et de décoration haut de gamme, fabriquée en bois massif. ` +
-    "Nous proposons une sélection soignée de meubles, canapés, tables, buffets et chaises, pensés pour sublimer chaque intérieur.\n\n" +
-    `Chaque pièce de notre catalogue est fabriquée sur commande (${DELAY_MSG.toLowerCase()}), garantissant ` +
-    "un savoir-faire artisanal et une qualité durable. Nous livrons en Corse, en France et en Europe.\n\n" +
-    "Ce catalogue présente l'ensemble de notre collection, organisée par catégorie. Chaque fiche produit " +
-    "détaille le prix et les dimensions disponibles.";
+  const presentationText = presentationTextFor(t, { brandName, collectionTitle: null });
   drawPresentationPage(doc, t, presentationText);
 
   const pageNumRef = { n: 1 };

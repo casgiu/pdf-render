@@ -73,6 +73,7 @@ model CatalogueTheme {
   lineColor       String   @default("#D8CFC0")
   fontFamily      String   @default("helvetica") // clé dans FONT_FAMILIES (pdf.server.js)
   tagline         String   @default("Mobilier & décoration haut de gamme")
+  presentationText String? // contenu de la deuxième page du catalogue
   brandName       String?
   logoUrl         String?
   mainMenuHandle  String?

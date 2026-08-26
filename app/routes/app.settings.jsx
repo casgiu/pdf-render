@@ -40,6 +40,7 @@ export const action = async ({ request }) => {
     lineColor: formData.get("lineColor"),
     fontFamily: formData.get("fontFamily"),
     tagline: formData.get("tagline"),
+    presentationText: formData.get("presentationText"),
     brandName: formData.get("brandName"),
     logoUrl: formData.get("logoUrl"),
     mainMenuHandle: formData.get("mainMenuHandle"),
@@ -88,6 +89,7 @@ export default function SettingsPage() {
     lineColor: theme.lineColor,
     fontFamily: theme.fontFamily,
     tagline: theme.tagline,
+    presentationText: theme.presentationText,
     brandName: theme.brandName,
     logoUrl: theme.logoUrl,
     mainMenuHandle: theme.mainMenuHandle,
@@ -140,6 +142,14 @@ export default function SettingsPage() {
   }
 
   const fontLabel = fontOptions.find((f) => f.key === values.fontFamily)?.label || values.fontFamily;
+
+  function suggestPresentationText() {
+    const brandName = values.brandName?.trim() || "Notre maison";
+    set("presentationText")(
+      `${brandName} propose une sélection de mobilier et de décoration pensée pour sublimer chaque intérieur.\n\n` +
+      "Chaque pièce est choisie avec soin pour sa qualité, ses matériaux et son caractère durable. Découvrez nos collections, leurs prix et les dimensions disponibles.",
+    );
+  }
 
   return (
     <s-page heading="Personnalisation du catalogue">
@@ -223,6 +233,29 @@ export default function SettingsPage() {
               onChange={(e) => set("tagline")(e.target.value)}
               style={textInputStyle}
             />
+          </div>
+
+          <div style={{ ...fieldRowStyle, alignItems: "flex-start" }}>
+            <label style={{ ...labelStyle, paddingTop: "7px" }} htmlFor="presentationText">Texte de présentation (page 2)</label>
+            <div style={{ flex: 1, maxWidth: "620px" }}>
+              <textarea
+                id="presentationText"
+                name="presentationText"
+                value={values.presentationText}
+                onChange={(e) => set("presentationText")(e.target.value)}
+                placeholder="Saisissez le texte qui doit apparaître sur la deuxième page du catalogue."
+                rows={8}
+                style={{ ...textInputStyle, width: "100%", maxWidth: "none", resize: "vertical", lineHeight: 1.45 }}
+              />
+              <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "12px" }}>
+                <button type="button" style={buttonStyle} onClick={suggestPresentationText}>
+                  Générer un texte suggéré
+                </button>
+                <span style={{ fontSize: "12px", color: "#6B6259" }}>
+                  Si ce champ est vide, le texte actuel du catalogue est conservé.
+                </span>
+              </div>
+            </div>
           </div>
 
           <div
