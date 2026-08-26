@@ -9,7 +9,7 @@ CREATE TABLE "CatalogueTheme" (
     "lineColor" TEXT NOT NULL DEFAULT '#D8CFC0',
     "fontFamily" TEXT NOT NULL DEFAULT 'helvetica',
     "tagline" TEXT NOT NULL DEFAULT 'Mobilier & décoration haut de gamme',
-    "updatedAt" DATETIME NOT NULL
+    "updatedAt" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateIndex
