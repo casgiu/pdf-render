@@ -7,7 +7,7 @@ name = "pdf-render"
 
 [access_scopes]
 # Génération de catalogue = lecture seule (produits, collections, metafields).
-scopes = "read_products"
+scopes = "read_products,read_online_store_navigation"
 
 [webhooks]
 api_version = "2026-10"

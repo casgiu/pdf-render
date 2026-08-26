@@ -4,6 +4,7 @@ import os from "os";
 import prisma from "../db.server";
 import {
   listCollections,
+  getMenuCollections,
   getProductsForCollection,
   stripHtml,
   truncateAtSentence,
@@ -94,8 +95,18 @@ export async function runJob(jobId, admin) {
       const collections = await listCollections(admin);
       const sections = [];
 
-      for (const cat of MAIN_MENU_CATEGORIES) {
-        const collection = collections.find((c) => c.handle === cat.handle);
+      // Une boutique universelle choisit son menu dans les réglages. On garde
+      // la liste Homa historique comme repli pour les boutiques déjà actives.
+      const menuCategories = await getMenuCollections(admin, theme.mainMenuHandle);
+      const categories = menuCategories.length > 0
+        ? menuCategories
+        : MAIN_MENU_CATEGORIES.map((category) => ({
+          title: category.title,
+          id: collections.find((collection) => collection.handle === category.handle)?.id,
+        })).filter((category) => category.id);
+
+      for (const cat of categories) {
+        const collection = collections.find((c) => c.id === cat.id);
         if (!collection) continue;
 
         const { collectionMeta, products } = await getProductsForCollection(admin, collection.id);

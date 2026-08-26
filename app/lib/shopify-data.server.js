@@ -38,6 +38,64 @@ export async function listCollections(admin) {
   return collections;
 }
 
+/** Liste les menus de navigation configurés dans Shopify (Contenu > Menus). */
+export async function listMenus(admin) {
+  const query = `#graphql
+    query ListMenus {
+      menus(first: 250) {
+        nodes { handle title }
+      }
+    }
+  `;
+  const res = await admin.graphql(query);
+  const { data } = await res.json();
+  return data?.menus?.nodes || [];
+}
+
+/**
+ * Transforme le menu choisi en sections de catalogue. On ne conserve que les
+ * entrées qui pointent vers des collections Shopify ; pages et liens externes
+ * restent de la navigation, mais n'ont pas de sens dans un catalogue produit.
+ */
+export async function getMenuCollections(admin, handle) {
+  if (!handle) return [];
+  const query = `#graphql
+    query MenuCollections {
+      menus(first: 250) {
+        nodes {
+          handle
+          items {
+            title
+            type
+            resourceId
+            items {
+              title
+              type
+              resourceId
+            }
+          }
+        }
+      }
+    }
+  `;
+  const res = await admin.graphql(query);
+  const { data } = await res.json();
+  const menu = data?.menus?.nodes?.find((item) => item.handle === handle);
+  if (!menu) return [];
+
+  const sections = [];
+  const addCollection = (item) => {
+    if (item.type === "COLLECTION" && item.resourceId && !sections.some((section) => section.id === item.resourceId)) {
+      sections.push({ id: item.resourceId, title: item.title });
+    }
+  };
+  for (const item of menu.items) {
+    addCollection(item);
+    for (const child of item.items || []) addCollection(child);
+  }
+  return sections;
+}
+
 /** Récupère tous les produits actifs d'une collection, avec image principale et variantes. */
 export async function getProductsForCollection(admin, collectionId) {
   const query = `#graphql

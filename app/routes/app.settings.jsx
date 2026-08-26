@@ -4,6 +4,7 @@ import PropTypes from "prop-types";
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getTheme, saveTheme, FONT_FAMILIES } from "../lib/theme.server";
+import { listMenus } from "../lib/shopify-data.server";
 
 const buttonStyle = {
   display: "inline-block",
@@ -22,10 +23,10 @@ const labelStyle = { width: "220px", fontSize: "14px" };
 const textInputStyle = { flex: 1, maxWidth: "420px", padding: "6px 8px", fontSize: "14px", fontFamily: "inherit" };
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const theme = await getTheme(session.shop);
+  const { admin, session } = await authenticate.admin(request);
+  const [theme, menus] = await Promise.all([getTheme(session.shop), listMenus(admin)]);
   const fontOptions = Object.entries(FONT_FAMILIES).map(([key, f]) => ({ key, label: f.label }));
-  return { theme, fontOptions };
+  return { theme, fontOptions, menus };
 };
 
 export const action = async ({ request }) => {
@@ -41,6 +42,7 @@ export const action = async ({ request }) => {
     tagline: formData.get("tagline"),
     brandName: formData.get("brandName"),
     logoUrl: formData.get("logoUrl"),
+    mainMenuHandle: formData.get("mainMenuHandle"),
   });
   return { ok: true };
 };
@@ -76,7 +78,7 @@ ColorField.propTypes = {
 
 export default function SettingsPage() {
   const loaderData = useLoaderData();
-  const { theme, fontOptions } = loaderData;
+  const { theme, fontOptions, menus } = loaderData;
   const shopify = useAppBridge();
   const [values, setValues] = useState({
     backgroundColor: theme.backgroundColor,
@@ -88,6 +90,7 @@ export default function SettingsPage() {
     tagline: theme.tagline,
     brandName: theme.brandName,
     logoUrl: theme.logoUrl,
+    mainMenuHandle: theme.mainMenuHandle,
   });
   const [saving, setSaving] = useState(false);
 
@@ -170,6 +173,25 @@ export default function SettingsPage() {
               <img src={values.logoUrl} alt="Logo sélectionné" style={{ maxWidth: "180px", maxHeight: "70px", objectFit: "contain", border: "1px solid #D8CFC0", padding: "6px" }} />
             </div>
           )}
+          <div style={fieldRowStyle}>
+            <label style={labelStyle} htmlFor="mainMenuHandle">Menu du catalogue complet</label>
+            <select
+              id="mainMenuHandle"
+              name="mainMenuHandle"
+              value={values.mainMenuHandle}
+              onChange={(e) => set("mainMenuHandle")(e.target.value)}
+              style={{ ...textInputStyle, maxWidth: "420px" }}
+            >
+              <option value="">Utiliser les catégories historiques</option>
+              {menus.map((menu) => (
+                <option key={menu.handle} value={menu.handle}>{menu.title}</option>
+              ))}
+            </select>
+          </div>
+          <s-paragraph>
+            Les entrées de ce menu qui pointent vers des collections deviennent les sections du catalogue,
+            dans le même ordre. Les pages et liens externes sont ignorés.
+          </s-paragraph>
           <ColorField name="backgroundColor" label="Fond (couverture, séparateurs)" value={values.backgroundColor} onChange={set("backgroundColor")} />
           <ColorField name="textColor" label="Texte principal" value={values.textColor} onChange={set("textColor")} />
           <ColorField name="accentColor" label="Accent (prix, accroche)" value={values.accentColor} onChange={set("accentColor")} />

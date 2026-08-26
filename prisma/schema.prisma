@@ -73,5 +73,6 @@ model CatalogueTheme {
   tagline         String   @default("Mobilier & décoration haut de gamme")
   brandName       String?
   logoUrl         String?
+  mainMenuHandle  String?
   updatedAt       DateTime @updatedAt
 }

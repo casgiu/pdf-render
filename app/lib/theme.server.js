@@ -20,6 +20,7 @@ const DEFAULTS = {
   tagline: "Mobilier & décoration haut de gamme",
   brandName: "",
   logoUrl: "",
+  mainMenuHandle: "",
 };
 
 export async function getTheme(shop) {
@@ -38,6 +39,7 @@ export async function saveTheme(shop, data) {
     tagline: data.tagline || DEFAULTS.tagline,
     brandName: data.brandName?.trim() || "",
     logoUrl: data.logoUrl?.trim() || "",
+    mainMenuHandle: data.mainMenuHandle?.trim() || "",
   };
   return prisma.catalogueTheme.upsert({
     where: { shop },
