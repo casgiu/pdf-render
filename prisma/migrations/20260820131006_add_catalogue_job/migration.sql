@@ -9,8 +9,8 @@ CREATE TABLE "CatalogueJob" (
     "fileName" TEXT,
     "filePath" TEXT,
     "errorMessage" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "completedAt" DATETIME
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" TIMESTAMP(3)
 );
 
 -- CreateIndex

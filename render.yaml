@@ -17,7 +17,7 @@ services:
       - key: SHOPIFY_APP_URL
         sync: false
       - key: DATABASE_URL
-        value: file:/data/prod.sqlite
+        sync: false
     disk:
       name: pdf-render-data
       mountPath: /data
