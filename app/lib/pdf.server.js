@@ -50,7 +50,10 @@ function defaultPresentationText({ brandName, collectionTitle }) {
 }
 
 function presentationTextFor(theme, context) {
-  return theme.presentationText || defaultPresentationText(context);
+  // Les textarea de navigateur enregistrent souvent des retours Windows (\r\n).
+  // PDFKit interprète le \r comme un glyphe visible (Ð) : on conserve seulement
+  // le saut de ligne universel avant de dessiner le texte.
+  return (theme.presentationText || defaultPresentationText(context)).replace(/\r\n?/g, '\n');
 }
 
 const DELAY_MSG = 'En commande sous 20 à 24 semaines';
