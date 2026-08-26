@@ -17,5 +17,11 @@ services:
         value: read_products,read_online_store_navigation
       - key: SHOPIFY_APP_URL
         sync: false
+      - key: LEGAL_ENTITY_NAME
+        sync: false
+      - key: SUPPORT_EMAIL
+        sync: false
+      - key: PRIVACY_CONTACT_EMAIL
+        sync: false
       - key: DATABASE_URL
         sync: false

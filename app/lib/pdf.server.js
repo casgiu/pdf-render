@@ -18,7 +18,7 @@ const DEFAULT_COLORS = {
 };
 
 const DEFAULT_FONTS = { regular: 'Helvetica', bold: 'Helvetica-Bold', italic: 'Helvetica-Oblique' };
-const DEFAULT_TAGLINE = 'Mobilier & décoration haut de gamme';
+const DEFAULT_TAGLINE = 'Découvrez notre sélection';
 
 /** Construit les palettes couleurs/polices utilisées par les fonctions de dessin à partir du thème choisi dans l'app (avec les valeurs actuelles comme repli). */
 function resolveTheme(theme) {
@@ -35,6 +35,7 @@ function resolveTheme(theme) {
     bodyFonts: theme?.bodyFonts || theme?.fonts || DEFAULT_FONTS,
     tagline: theme?.tagline || DEFAULT_TAGLINE,
     presentationText: theme?.presentationText?.trim() || '',
+    brandName: theme?.brandName?.trim() || '',
   };
 }
 
@@ -42,11 +43,9 @@ function defaultPresentationText({ brandName, collectionTitle }) {
   const collectionSentence = collectionTitle
     ? `Ce catalogue présente notre sélection ${collectionTitle.toLowerCase()}.`
     : "Ce catalogue présente l'ensemble de notre collection, organisée par catégorie.";
-  return `${brandName} est une maison de mobilier et de décoration haut de gamme, fabriquée en bois massif. ` +
-    "Nous proposons une sélection soignée de meubles, canapés, tables, buffets et chaises, pensés pour sublimer chaque intérieur.\n\n" +
-    `Chaque pièce de notre catalogue est fabriquée sur commande (${DELAY_MSG.toLowerCase()}), garantissant ` +
-    "un savoir-faire artisanal et une qualité durable. Nous livrons en Corse, en France et en Europe.\n\n" +
-    `${collectionSentence} Chaque fiche produit détaille le prix et les dimensions disponibles.`;
+  return `${brandName} vous présente une sélection de produits pensée pour votre boutique. ` +
+    "Ce catalogue réunit les informations utiles pour découvrir chaque article : images, prix, descriptions et caractéristiques.\n\n" +
+    `${collectionSentence} Chaque fiche produit détaille les options disponibles.`;
 }
 
 function presentationTextFor(theme, context) {
@@ -56,7 +55,7 @@ function presentationTextFor(theme, context) {
   return (theme.presentationText || defaultPresentationText(context)).replace(/\r\n?/g, '\n');
 }
 
-const DELAY_MSG = 'En commande sous 20 à 24 semaines';
+const DELAY_MSG = 'Disponible sur commande';
 
 function priceStr(amount, currency = 'EUR') {
   const symbol = currency === 'EUR' ? '€' : currency;
@@ -100,7 +99,7 @@ function drawCoverPage(doc, { colors, headingFonts, bodyFonts, tagline, logoPath
 
   doc.rect(0, 0, PAGE_W, PAGE_H).fill(colors.cream);
 
-  // Logo en haut de la page (le mot-symbole "Homa Home" est déjà intégré à l'image).
+  // Le logo sélectionné par le marchand est affiché en haut de la couverture.
   const logoW = 170;
   const logoH = logoW * LOGO_ASPECT_RATIO;
   const logoY = 40;
@@ -126,7 +125,7 @@ function drawCoverPage(doc, { colors, headingFonts, bodyFonts, tagline, logoPath
   }
 }
 
-function drawPresentationPage(doc, { colors, headingFonts, bodyFonts }, presentationText) {
+function drawPresentationPage(doc, { colors, headingFonts, bodyFonts, brandName }, presentationText) {
   const PAGE_W = doc.page.width;
   const PAGE_H = doc.page.height;
 
@@ -135,7 +134,7 @@ function drawPresentationPage(doc, { colors, headingFonts, bodyFonts }, presenta
   let y = 100;
 
   doc.fontSize(22).fillColor(colors.darkBrown).font(headingFonts.bold)
-    .text('Bienvenue chez Homa Home', margin, y);
+    .text(`Bienvenue chez ${brandName || "notre boutique"}`, margin, y);
   y += 40;
   doc.moveTo(margin, y).lineTo(margin + 130, y).lineWidth(1.2).stroke(colors.gold);
   y += 30;
@@ -162,7 +161,7 @@ function drawCategoryDividerPage(doc, { colors, headingFonts }, categoryTitle, i
 }
 
 function footerText(brandName, collectionLabel) {
-  return `${brandName || "Homa Home"} — Catalogue ${collectionLabel}`;
+  return `${brandName || "Notre boutique"} — Catalogue ${collectionLabel}`;
 }
 
 /** Dessine les fiches produits (2 par page) pour une liste de produits, avec footer. */
@@ -267,7 +266,7 @@ function drawProductPages(doc, { colors, headingFonts, bodyFonts, brandName }, p
  */
 export function generateCatalogPDF({ outputPath, collectionMeta, products, coverImagePath, theme }) {
   const t = resolveTheme(theme);
-  const brandName = t.brandName || "Homa Home";
+  const brandName = t.brandName || "Notre boutique";
   const doc = new PDFDocument({ size: 'A4', margin: 0 });
   const stream = fs.createWriteStream(outputPath);
   const finished = new Promise((resolve, reject) => {
@@ -299,7 +298,7 @@ export function generateCatalogPDF({ outputPath, collectionMeta, products, cover
  */
 export function generateFullCatalogPDF({ outputPath, coverImagePath, sections, theme }) {
   const t = resolveTheme(theme);
-  const brandName = t.brandName || "Homa Home";
+  const brandName = t.brandName || "Notre boutique";
   const doc = new PDFDocument({ size: 'A4', margin: 0 });
   const stream = fs.createWriteStream(outputPath);
   const finished = new Promise((resolve, reject) => {

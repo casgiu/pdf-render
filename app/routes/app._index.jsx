@@ -4,6 +4,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { listCollections } from "../lib/shopify-data.server";
 import { listRecentJobs } from "../lib/catalogue-jobs.server";
+import { getTheme, isOnboardingComplete } from "../lib/theme.server";
 
 const buttonStyle = {
   display: "inline-block",
@@ -29,15 +30,16 @@ const STATUS_LABELS = {
 
 export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
-  const [collections, jobs] = await Promise.all([
+  const [collections, jobs, theme] = await Promise.all([
     listCollections(admin),
     listRecentJobs(session.shop),
+    getTheme(session.shop),
   ]);
   const withProducts = collections
     .filter((c) => c.productsCount.count > 0)
     .sort((a, b) => a.title.localeCompare(b.title, "fr"));
 
-  return { collections: withProducts, jobs };
+  return { collections: withProducts, jobs, setupComplete: isOnboardingComplete(theme) };
 };
 
 function filenameFromResponse(response, fallback) {
@@ -153,6 +155,16 @@ export default function CataloguePage() {
     startPolling(jobId);
   }
 
+  async function revokeFlipbook(jobId) {
+    const res = await fetch(`/app/catalogue/flipbook/${jobId}/revoke`, { method: "POST" });
+    if (!res.ok) {
+      shopify.toast.show("La révocation du flipbook a échoué", { isError: true });
+      return;
+    }
+    setJobs((prev) => prev.map((job) => (job.id === jobId ? { ...job, flipbookPublished: false } : job)));
+    shopify.toast.show("Le lien du flipbook a été révoqué");
+  }
+
   const activeJobIds = new Set(
     jobs.filter((j) => j.status === "pending" || j.status === "running").map((j) => j.id),
   );
@@ -162,13 +174,18 @@ export default function CataloguePage() {
 
   return (
     <s-page heading="Catalogues PDF">
+      {!loaderData.setupComplete && (
+        <s-section heading="Configurez FolioMise">
+          <s-paragraph>
+            1. Ajoutez votre identité de marque. 2. Choisissez le menu qui organise votre catalogue complet. 3. Générez votre premier catalogue.
+          </s-paragraph>
+          <a href="/app/settings" style={buttonStyle}>Configurer mon catalogue</a>
+        </s-section>
+      )}
       <s-section heading="Catalogue complet">
         <s-paragraph>
-          Un seul PDF avec tous les produits actifs, classés par les 7
-          catégories du menu principal (Salons, Salle à manger, Chambres,
-          Luminaires, Professionnels, Extérieur, Décorations). La génération
-          se fait en arrière-plan : tu peux fermer cette page, le catalogue
-          apparaîtra dans l&apos;historique une fois prêt.
+          Un seul PDF avec tous les produits actifs, organisé selon le menu choisi dans vos réglages.
+          Sans menu sélectionné, FolioMise utilise vos collections actives. La génération se fait en arrière-plan.
         </s-paragraph>
         <button
           type="button"
@@ -259,15 +276,18 @@ export default function CataloguePage() {
                             Réessayer le flipbook
                           </button>
                         )}
-                        {job.flipbookStatus === "done" && (
-                          <a
-                            href={`/flipbook/${job.flipbookToken}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={buttonStyleSmall}
-                          >
-                            Ouvrir le flipbook
-                          </a>
+                        {job.flipbookStatus === "done" && job.flipbookPublished && (
+                          <>
+                            <a href={`/flipbook/${job.flipbookToken}`} target="_blank" rel="noreferrer" style={buttonStyleSmall}>
+                              Ouvrir le flipbook
+                            </a>
+                            <button type="button" style={buttonStyleSmall} onClick={() => revokeFlipbook(job.id)}>
+                              Révoquer le lien
+                            </button>
+                          </>
+                        )}
+                        {job.flipbookStatus === "done" && !job.flipbookPublished && (
+                          <s-paragraph>Flipbook révoqué.</s-paragraph>
                         )}
                       </s-stack>
                     )}

@@ -9,7 +9,6 @@ import {
   stripHtml,
   truncateAtSentence,
   buildCharacteristics,
-  MAIN_MENU_CATEGORIES,
 } from "./shopify-data.server.js";
 import crypto from "crypto";
 import { downloadImage } from "./images.server.js";
@@ -87,6 +86,19 @@ export async function createJob({ shop, type, label, collectionId }) {
 
 export async function getJob(id, shop) {
   return prisma.catalogueJob.findFirst({ where: { id, shop } });
+}
+
+export async function revokeFlipbook(id, shop) {
+  const job = await getJob(id, shop);
+  if (!job || job.flipbookStatus !== "done") return null;
+  return prisma.catalogueJob.update({
+    where: { id },
+    data: { flipbookPublished: false },
+  });
+}
+
+export function isFlipbookPublic(job) {
+  return Boolean(job && job.flipbookStatus === "done" && job.flipbookPublished);
 }
 
 export async function listRecentJobs(shop, limit = 15) {
@@ -167,15 +179,14 @@ export async function runJob(jobId, admin) {
       const collections = await listCollections(admin);
       const sections = [];
 
-      // Une boutique universelle choisit son menu dans les réglages. On garde
-      // la liste Homa historique comme repli pour les boutiques déjà actives.
+      // Une boutique choisit ses sections via son menu. Sans menu, toutes les
+      // collections non vides restent disponibles dans un ordre prévisible.
       const menuCategories = await getMenuCollections(admin, theme.mainMenuHandle);
       const categories = menuCategories.length > 0
         ? menuCategories
-        : MAIN_MENU_CATEGORIES.map((category) => ({
-          title: category.title,
-          id: collections.find((collection) => collection.handle === category.handle)?.id,
-        })).filter((category) => category.id);
+        : collections
+          .filter((collection) => collection.productsCount.count > 0)
+          .map((collection) => ({ title: collection.title, id: collection.id }));
 
       for (const cat of categories) {
         const collection = collections.find((c) => c.id === cat.id);
@@ -245,8 +256,15 @@ export async function runFlipbookJob(jobId) {
 
     await prisma.catalogueJob.update({
       where: { id: jobId },
-      data: { flipbookStatus: "done", flipbookToken: token, flipbookKey, flipbookPath: null },
+      data: {
+        flipbookStatus: "done",
+        flipbookToken: token,
+        flipbookKey,
+        flipbookPath: null,
+        flipbookPublished: true,
+      },
     });
+    if (job.flipbookKey && job.flipbookKey !== flipbookKey) await deleteObject(job.flipbookKey);
     if (job.fileKey) {
       await fs.promises.rm(localPdfPath, { force: true }).catch((cleanupError) => {
         logger.warn("flipbook_temporary_pdf_cleanup_failed", { jobId, error: cleanupError.message });

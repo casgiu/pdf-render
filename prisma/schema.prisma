@@ -57,6 +57,7 @@ model CatalogueJob {
   flipbookKey    String? // clé R2 (HTML); flipbookPath est gardé pour les anciens flipbooks locaux
   flipbookPath   String?
   flipbookError  String?
+  flipbookPublished Boolean @default(true)
 
   @@index([shop, createdAt])
 }
@@ -79,5 +80,6 @@ model CatalogueTheme {
   brandName       String?
   logoUrl         String?
   mainMenuHandle  String?
+  onboardingCompletedAt DateTime?
   updatedAt       DateTime @updatedAt
 }

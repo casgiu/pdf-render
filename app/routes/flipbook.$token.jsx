@@ -1,5 +1,5 @@
 import fs from "fs";
-import { getJobByFlipbookToken } from "../lib/catalogue-jobs.server";
+import { getJobByFlipbookToken, isFlipbookPublic } from "../lib/catalogue-jobs.server";
 import { getObjectBuffer } from "../lib/object-storage.server";
 
 // Page publique (pas d'authentification Shopify) : le lien est fait pour
@@ -7,7 +7,7 @@ import { getObjectBuffer } from "../lib/object-storage.server";
 export const loader = async ({ params }) => {
   const job = await getJobByFlipbookToken(params.token);
 
-  if (!job || job.flipbookStatus !== "done") {
+  if (!isFlipbookPublic(job)) {
     throw new Response("Flipbook introuvable.", { status: 404 });
   }
 

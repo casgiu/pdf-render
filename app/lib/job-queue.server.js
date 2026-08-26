@@ -37,6 +37,14 @@ export async function enqueueFlipbookJob(jobId) {
   return getQueue().add("flipbook", { jobId }, { jobId: `flipbook-${jobId}` });
 }
 
+export async function removeCatalogueJobFromQueue(jobId) {
+  const currentQueue = getQueue();
+  await Promise.all([
+    currentQueue.remove(`catalogue-${jobId}`),
+    currentQueue.remove(`flipbook-${jobId}`),
+  ]);
+}
+
 export function getQueueConnection() {
   return getConnection();
 }

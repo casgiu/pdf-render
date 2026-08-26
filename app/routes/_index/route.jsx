@@ -1,5 +1,4 @@
-import { redirect, Form, useLoaderData } from "react-router";
-import { login } from "../../shopify.server";
+import { redirect } from "react-router";
 import styles from "./styles.module.css";
 
 export const loader = async ({ request }) => {
@@ -9,32 +8,21 @@ export const loader = async ({ request }) => {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  return { showForm: Boolean(login) };
+  return null;
 };
 
 export default function App() {
-  const { showForm } = useLoaderData();
-
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>Catalogues PDF Homa Home</h1>
+        <h1 className={styles.heading}>FolioMise</h1>
         <p className={styles.text}>
           Génère des catalogues PDF à partir des produits de la boutique,
           classés par collection ou par catégorie.
         </p>
-        {showForm && (
-          <Form className={styles.form} method="post" action="/auth/login">
-            <label className={styles.label}>
-              <span>Shop domain</span>
-              <input className={styles.input} type="text" name="shop" />
-              <span>e.g: my-shop-domain.myshopify.com</span>
-            </label>
-            <button className={styles.button} type="submit">
-              Log in
-            </button>
-          </Form>
-        )}
+        <p className={styles.text}>
+          Installez FolioMise depuis le Shopify App Store pour commencer à créer vos catalogues.
+        </p>
         <ul className={styles.list}>
           <li>
             <strong>Catalogue par collection</strong>. Un PDF pour une seule
@@ -42,7 +30,7 @@ export default function App() {
           </li>
           <li>
             <strong>Catalogue complet</strong>. Tous les produits actifs,
-            classés par les 7 catégories du menu principal.
+            organisés selon le menu de navigation que vous choisissez.
           </li>
           <li>
             <strong>Toujours à jour</strong>. Généré à la demande depuis les

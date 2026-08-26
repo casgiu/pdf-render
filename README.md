@@ -1,4 +1,4 @@
-# PDF Render
+# FolioMise
 
 Application Shopify embarquée pour générer des catalogues de produits au format PDF et des flipbooks partageables.
 
@@ -48,7 +48,7 @@ Ne jamais versionner les valeurs réelles dans le dépôt.
 SHOPIFY_API_KEY=
 SHOPIFY_API_SECRET=
 SHOPIFY_APP_URL=
-SCOPES=read_products
+SCOPES=read_products,read_online_store_navigation
 
 # PostgreSQL
 DATABASE_URL=
@@ -68,9 +68,16 @@ RUN_WORKER_IN_WEB_PROCESS=true
 
 # Observabilité (optionnel) : URL de webhook compatible Slack pour les erreurs critiques.
 ERROR_ALERT_WEBHOOK_URL=
+
+# Pages publiques App Store
+LEGAL_ENTITY_NAME=
+SUPPORT_EMAIL=
+PRIVACY_CONTACT_EMAIL=
 ```
 
 En production, `DATABASE_URL` doit pointer vers l'URL interne PostgreSQL de Render. Les variables R2 et Redis sont fournies via les groupes de variables liés au service Render.
+
+Avant toute soumission App Store, renseignez les coordonnées légales réelles ci-dessus et configurez dans le Partner Dashboard les URLs `https://<votre-domaine>/privacy` et `https://<votre-domaine>/support`.
 
 ## Commandes utiles
 

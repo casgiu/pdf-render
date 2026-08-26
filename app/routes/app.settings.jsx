@@ -3,7 +3,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import PropTypes from "prop-types";
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
-import { getTheme, saveTheme, FONT_FAMILIES } from "../lib/theme.server";
+import { completeOnboarding, getTheme, isOnboardingComplete, saveTheme, FONT_FAMILIES } from "../lib/theme.server";
 import { listMenus } from "../lib/shopify-data.server";
 
 const buttonStyle = {
@@ -32,7 +32,7 @@ export const loader = async ({ request }) => {
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const formData = await request.formData();
-  await saveTheme(session.shop, {
+  const theme = await saveTheme(session.shop, {
     backgroundColor: formData.get("backgroundColor"),
     textColor: formData.get("textColor"),
     accentColor: formData.get("accentColor"),
@@ -47,6 +47,7 @@ export const action = async ({ request }) => {
     logoUrl: formData.get("logoUrl"),
     mainMenuHandle: formData.get("mainMenuHandle"),
   });
+  if (isOnboardingComplete(theme) && !theme.onboardingCompletedAt) await completeOnboarding(session.shop);
   return { ok: true };
 };
 
@@ -160,8 +161,7 @@ export default function SettingsPage() {
     <s-page heading="Personnalisation du catalogue">
       <s-section heading="Couleurs">
         <s-paragraph>
-          Ces couleurs sont utilisées sur toutes les pages du catalogue (couverture, fiches produit,
-          séparateurs de catégorie). Les valeurs actuelles correspondent à l&apos;identité Homa Home.
+          Ces couleurs sont utilisées sur toutes les pages du catalogue : couverture, fiches produit et séparateurs de catégorie.
         </s-paragraph>
         <form onSubmit={handleSubmit}>
           <div style={fieldRowStyle}>
@@ -197,7 +197,7 @@ export default function SettingsPage() {
               onChange={(e) => set("mainMenuHandle")(e.target.value)}
               style={{ ...textInputStyle, maxWidth: "420px" }}
             >
-              <option value="">Utiliser les catégories historiques</option>
+              <option value="">Utiliser toutes les collections actives</option>
               {menus.map((menu) => (
                 <option key={menu.handle} value={menu.handle}>{menu.title}</option>
               ))}

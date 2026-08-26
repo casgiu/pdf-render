@@ -288,15 +288,3 @@ export function truncateAtSentence(text, maxWords = 80) {
 
   return `${withinLimit}…`;
 }
-
-const MAIN_MENU_CATEGORIES = [
-  { title: 'Salons', handle: 'salons' },
-  { title: 'Salle à manger', handle: 'salle-a-manger' },
-  { title: 'Chambres', handle: 'chambres' },
-  { title: 'Luminaires', handle: 'luminaires' },
-  { title: 'Professionnels', handle: 'professionnels' },
-  { title: 'Extérieur', handle: 'exterieur' },
-  { title: 'Décorations', handle: 'decoration' },
-];
-
-export { MAIN_MENU_CATEGORIES };

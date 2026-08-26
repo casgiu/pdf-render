@@ -19,5 +19,6 @@ export const loader = async ({ request, params }) => {
     flipbookStatus: job.flipbookStatus,
     flipbookToken: job.flipbookToken,
     flipbookError: job.flipbookError,
+    flipbookPublished: job.flipbookPublished,
   });
 };

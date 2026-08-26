@@ -23,7 +23,7 @@ const DEFAULTS = {
   fontFamily: "helvetica",
   headingFontFamily: "helvetica",
   bodyFontFamily: "helvetica",
-  tagline: "Mobilier & décoration haut de gamme",
+  tagline: "Découvrez notre sélection",
   presentationText: "",
   brandName: "",
   logoUrl: "",
@@ -61,5 +61,16 @@ export async function saveTheme(shop, data) {
     where: { shop },
     create: { shop, ...fields },
     update: fields,
+  });
+}
+
+export function isOnboardingComplete(theme) {
+  return Boolean(theme?.brandName?.trim() && theme?.mainMenuHandle?.trim());
+}
+
+export async function completeOnboarding(shop) {
+  return prisma.catalogueTheme.update({
+    where: { shop },
+    data: { onboardingCompletedAt: new Date() },
   });
 }
