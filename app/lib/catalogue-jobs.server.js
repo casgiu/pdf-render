@@ -79,8 +79,8 @@ export async function listRecentJobs(shop, limit = 15) {
 
 /**
  * Exécute réellement la génération et met à jour le job au fil de l'eau.
- * Conçue pour être appelée sans `await` (fire-and-forget) depuis la route
- * qui crée le job, afin de répondre immédiatement au navigateur.
+ * Exécutée par le worker BullMQ. En cas d'erreur, elle met à jour le statut
+ * puis relance l'erreur afin que BullMQ puisse réessayer le job.
  */
 export async function runJob(jobId, admin) {
   await prisma.catalogueJob.update({ where: { id: jobId }, data: { status: "running" } });
@@ -141,12 +141,13 @@ export async function runJob(jobId, admin) {
       where: { id: jobId },
       data: { status: "error", errorMessage: err.message?.slice(0, 500) || "Erreur inconnue", completedAt: new Date() },
     });
+    throw err;
   }
 }
 
 /**
  * Lance la génération d'un flipbook à partir du PDF déjà produit par un job
- * terminé. Comme runJob, conçue pour être appelée sans `await`.
+ * terminé. Elle est exécutée et relancée par le worker BullMQ.
  */
 export async function runFlipbookJob(jobId) {
   await prisma.catalogueJob.update({ where: { id: jobId }, data: { flipbookStatus: "running" } });
@@ -185,6 +186,7 @@ export async function runFlipbookJob(jobId) {
       where: { id: jobId },
       data: { flipbookStatus: "error", flipbookError: err.message?.slice(0, 500) || "Erreur inconnue" },
     });
+    throw err;
   }
 }
 
