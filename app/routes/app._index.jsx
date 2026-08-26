@@ -179,7 +179,9 @@ export default function CataloguePage() {
           <s-paragraph>
             1. Ajoutez votre identité de marque. 2. Choisissez le menu qui organise votre catalogue complet. 3. Générez votre premier catalogue.
           </s-paragraph>
-          <s-link href="/app/settings">Configurer mon catalogue</s-link>
+          <s-button href="/app/settings" variant="primary">
+            Configurer mon catalogue
+          </s-button>
         </s-section>
       )}
       <s-section heading="Catalogue complet">
