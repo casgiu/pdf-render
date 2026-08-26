@@ -19,12 +19,13 @@ import { getTheme, FONT_FAMILIES } from "./theme.server.js";
 import { deleteObject, downloadObjectToFile, uploadFile } from "./object-storage.server.js";
 import { logger, reportError } from "./observability.server.js";
 
-/** Réglages de thème (couleurs, accroche) + police résolue depuis sa clé, prêts pour pdf.server.js. */
+/** Réglages de thème + polices de titre et de texte résolues, prêts pour pdf.server.js. */
 async function resolvePdfTheme(shop) {
   const theme = await getTheme(shop);
-  const fonts = FONT_FAMILIES[theme.fontFamily] || FONT_FAMILIES.helvetica;
+  const headingFonts = FONT_FAMILIES[theme.headingFontFamily] || FONT_FAMILIES.helvetica;
+  const bodyFonts = FONT_FAMILIES[theme.bodyFontFamily] || FONT_FAMILIES.helvetica;
   const logoPath = await downloadImage(theme.logoUrl, 500, 90);
-  return { ...theme, fonts, logoPath };
+  return { ...theme, headingFonts, bodyFonts, logoPath };
 }
 
 // R2 est la source de vérité. Le disque local ne sert plus qu'aux fichiers

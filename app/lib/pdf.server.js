@@ -31,7 +31,8 @@ function resolveTheme(theme) {
       lightLine: theme?.lineColor || DEFAULT_COLORS.lightLine,
       white: DEFAULT_COLORS.white,
     },
-    fonts: theme?.fonts || DEFAULT_FONTS,
+    headingFonts: theme?.headingFonts || theme?.fonts || DEFAULT_FONTS,
+    bodyFonts: theme?.bodyFonts || theme?.fonts || DEFAULT_FONTS,
     tagline: theme?.tagline || DEFAULT_TAGLINE,
     presentationText: theme?.presentationText?.trim() || '',
   };
@@ -90,7 +91,7 @@ function drawImageOrPlaceholder(doc, colors, imgPath, x, y, w, h) {
   doc.restore();
 }
 
-function drawCoverPage(doc, { colors, fonts, tagline, logoPath, brandName }, { title, subtitle, coverImagePath }) {
+function drawCoverPage(doc, { colors, headingFonts, bodyFonts, tagline, logoPath, brandName }, { title, subtitle, coverImagePath }) {
   const PAGE_W = doc.page.width;
   const PAGE_H = doc.page.height;
 
@@ -104,25 +105,25 @@ function drawCoverPage(doc, { colors, fonts, tagline, logoPath, brandName }, { t
   if (resolvedLogoPath && fs.existsSync(resolvedLogoPath)) {
     doc.image(resolvedLogoPath, (PAGE_W - logoW) / 2, logoY, { width: logoW });
   } else if (brandName) {
-    doc.fontSize(24).fillColor(colors.darkBrown).font(fonts.bold)
+    doc.fontSize(24).fillColor(colors.darkBrown).font(headingFonts.bold)
       .text(brandName, 0, logoY + 20, { align: "center" });
   }
 
   const imgX = 40, imgY = logoY + logoH + 25, imgW = PAGE_W - 80, imgH = 290;
   drawImageOrPlaceholder(doc, colors, coverImagePath, imgX, imgY, imgW, imgH);
 
-  doc.fontSize(14).fillColor(colors.gold).font(fonts.italic)
+  doc.fontSize(14).fillColor(colors.gold).font(bodyFonts.italic)
     .text(tagline, 0, imgY + imgH + 65, { align: 'center' });
 
-  doc.fontSize(16).fillColor(colors.darkBrown).font(fonts.regular)
+  doc.fontSize(16).fillColor(colors.darkBrown).font(headingFonts.regular)
     .text(title, 0, PAGE_H - 120, { align: 'center' });
   if (subtitle) {
-    doc.fontSize(12).fillColor(colors.taupe).font(fonts.regular)
+    doc.fontSize(12).fillColor(colors.taupe).font(bodyFonts.regular)
       .text(subtitle, 0, PAGE_H - 95, { align: 'center' });
   }
 }
 
-function drawPresentationPage(doc, { colors, fonts }, presentationText) {
+function drawPresentationPage(doc, { colors, headingFonts, bodyFonts }, presentationText) {
   const PAGE_W = doc.page.width;
   const PAGE_H = doc.page.height;
 
@@ -130,18 +131,18 @@ function drawPresentationPage(doc, { colors, fonts }, presentationText) {
   const margin = 70;
   let y = 100;
 
-  doc.fontSize(22).fillColor(colors.darkBrown).font(fonts.bold)
+  doc.fontSize(22).fillColor(colors.darkBrown).font(headingFonts.bold)
     .text('Bienvenue chez Homa Home', margin, y);
   y += 40;
   doc.moveTo(margin, y).lineTo(margin + 130, y).lineWidth(1.2).stroke(colors.gold);
   y += 30;
 
-  doc.fontSize(13).fillColor(colors.darkBrown).font(fonts.regular)
+  doc.fontSize(13).fillColor(colors.darkBrown).font(bodyFonts.regular)
     .text(presentationText, margin, y, { width: PAGE_W - margin * 2, lineGap: 4 });
 }
 
 /** Page de séparation entre deux catégories, dans le catalogue complet. */
-function drawCategoryDividerPage(doc, { colors, fonts }, categoryTitle, imagePath) {
+function drawCategoryDividerPage(doc, { colors, headingFonts }, categoryTitle, imagePath) {
   const PAGE_W = doc.page.width;
   const PAGE_H = doc.page.height;
 
@@ -153,7 +154,7 @@ function drawCategoryDividerPage(doc, { colors, fonts }, categoryTitle, imagePat
   doc.moveTo(PAGE_W / 2 - 65, imgY + imgH + 35).lineTo(PAGE_W / 2 + 65, imgY + imgH + 35)
     .lineWidth(1.2).stroke(colors.gold);
 
-  doc.fontSize(30).fillColor(colors.darkBrown).font(fonts.bold)
+  doc.fontSize(30).fillColor(colors.darkBrown).font(headingFonts.bold)
     .text(categoryTitle, 0, imgY + imgH + 55, { align: 'center' });
 }
 
@@ -162,7 +163,7 @@ function footerText(brandName, collectionLabel) {
 }
 
 /** Dessine les fiches produits (2 par page) pour une liste de produits, avec footer. */
-function drawProductPages(doc, { colors, fonts, brandName }, products, footerLabel, pageNumRef) {
+function drawProductPages(doc, { colors, headingFonts, bodyFonts, brandName }, products, footerLabel, pageNumRef) {
   const PAGE_W = doc.page.width;
   const PAGE_H = doc.page.height;
 
@@ -181,12 +182,12 @@ function drawProductPages(doc, { colors, fonts, brandName }, products, footerLab
     const outOfStock = totalStock === 0;
 
     let ty = topY;
-    doc.fontSize(12.5).fillColor(colors.darkBrown).font(fonts.bold)
+    doc.fontSize(12.5).fillColor(colors.darkBrown).font(headingFonts.bold)
       .text(p.title, contentX, ty, { width: contentW });
     ty = doc.y + 4;
 
     const price = p.priceRangeV2?.minVariantPrice;
-    doc.fontSize(11.5).fillColor(colors.gold).font(fonts.bold)
+    doc.fontSize(11.5).fillColor(colors.gold).font(headingFonts.bold)
       .text(priceStr(price.amount, price.currencyCode), contentX, ty);
     ty = doc.y + 3;
 
@@ -194,7 +195,7 @@ function drawProductPages(doc, { colors, fonts, brandName }, products, footerLab
     // (les articles en stock partent plus vite ; le stock lui-même n'est
     // volontairement pas affiché car il change en permanence).
     if (outOfStock) {
-      doc.fontSize(9).fillColor(colors.taupe).font(fonts.italic)
+      doc.fontSize(9).fillColor(colors.taupe).font(bodyFonts.italic)
         .text(DELAY_MSG, contentX, ty);
       ty = doc.y + 5;
     } else {
@@ -203,7 +204,7 @@ function drawProductPages(doc, { colors, fonts, brandName }, products, footerLab
 
     // Description affichée en entier (pas de troncature) : on mesure sa hauteur
     // réelle pour positionner correctement le bloc suivant.
-    doc.fontSize(9.5).fillColor(colors.darkBrown).font(fonts.regular);
+    doc.fontSize(9.5).fillColor(colors.darkBrown).font(bodyFonts.regular);
     const descHeight = doc.heightOfString(p.descriptionPlain, { width: contentW, lineGap: 3 });
     doc.text(p.descriptionPlain, contentX, ty, { width: contentW, lineGap: 3 });
     ty = ty + descHeight + 10;
@@ -212,7 +213,7 @@ function drawProductPages(doc, { colors, fonts, brandName }, products, footerLab
     // affichées en une ligne compacte séparée par des puces.
     if (p.characteristics && p.characteristics.length > 0) {
       const charsLine = p.characteristics.map(c => `${c.label} : ${c.value}`).join('   •   ');
-      doc.fontSize(7.5).fillColor(colors.taupe).font(fonts.regular);
+      doc.fontSize(7.5).fillColor(colors.taupe).font(bodyFonts.regular);
       const charsHeight = doc.heightOfString(charsLine, { width: contentW, lineGap: 2 });
       doc.text(charsLine, contentX, ty, { width: contentW, lineGap: 2 });
       ty = ty + charsHeight + 10;
@@ -223,11 +224,11 @@ function drawProductPages(doc, { colors, fonts, brandName }, products, footerLab
     // en haut de la fiche suffit.
     const singleVariant = p.variants.length === 1;
     if (!singleVariant) {
-      doc.fontSize(9).fillColor(colors.darkBrown).font(fonts.bold)
+      doc.fontSize(9).fillColor(colors.darkBrown).font(headingFonts.bold)
         .text('Dimensions disponibles', contentX, ty);
       ty = doc.y + 5;
 
-      doc.fontSize(9).font(fonts.regular);
+      doc.fontSize(9).font(bodyFonts.regular);
       const col2 = contentX + contentW * 0.5;
       for (const v of p.variants.slice(0, 4)) {
         doc.fillColor(colors.darkBrown).text(`• ${v.title}`, contentX, ty, { continued: false });
@@ -246,7 +247,7 @@ function drawProductPages(doc, { colors, fonts, brandName }, products, footerLab
     drawCard(products[i], pMargin);
     if (products[i + 1]) drawCard(products[i + 1], pMargin + cardH + cardGap);
 
-    doc.fontSize(9).fillColor(colors.taupe).font(fonts.regular)
+    doc.fontSize(9).fillColor(colors.taupe).font(bodyFonts.regular)
       .text(`${footerText(brandName, footerLabel)} — page ${pageNumRef.n}`, 0, PAGE_H - 30, { align: 'center' });
     pageNumRef.n++;
   }

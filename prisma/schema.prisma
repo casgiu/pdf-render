@@ -72,6 +72,8 @@ model CatalogueTheme {
   mutedColor      String   @default("#8A7B6C")
   lineColor       String   @default("#D8CFC0")
   fontFamily      String   @default("helvetica") // clé dans FONT_FAMILIES (pdf.server.js)
+  headingFontFamily String? // police des titres ; fontFamily reste le repli des réglages existants
+  bodyFontFamily    String? // police des textes
   tagline         String   @default("Mobilier & décoration haut de gamme")
   presentationText String? // contenu de la deuxième page du catalogue
   brandName       String?

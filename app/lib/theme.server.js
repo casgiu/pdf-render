@@ -1,13 +1,17 @@
 import prisma from "../db.server.js";
 
-// Familles de polices proposées dans les réglages. On se limite volontairement
-// aux polices standard PDF (base 14) : elles n'ont pas besoin d'être embarquées
-// dans le fichier, contrairement à une police custom (Google Fonts, etc.) qui
-// demanderait de télécharger et enregistrer un fichier .ttf via doc.registerFont.
+// Styles standard PDF disponibles sans téléchargement ni dépendance externe.
+// Ils restent donc fiables quel que soit l'environnement qui génère le catalogue.
 export const FONT_FAMILIES = {
   helvetica: { label: "Helvetica (sans-serif, actuel)", regular: "Helvetica", bold: "Helvetica-Bold", italic: "Helvetica-Oblique" },
+  helveticaBold: { label: "Helvetica gras", regular: "Helvetica-Bold", bold: "Helvetica-Bold", italic: "Helvetica-BoldOblique" },
+  helveticaItalic: { label: "Helvetica italique", regular: "Helvetica-Oblique", bold: "Helvetica-BoldOblique", italic: "Helvetica-Oblique" },
   times: { label: "Times (serif, classique)", regular: "Times-Roman", bold: "Times-Bold", italic: "Times-Italic" },
+  timesBold: { label: "Times gras", regular: "Times-Bold", bold: "Times-Bold", italic: "Times-BoldItalic" },
+  timesItalic: { label: "Times italique", regular: "Times-Italic", bold: "Times-BoldItalic", italic: "Times-Italic" },
   courier: { label: "Courier (monospace)", regular: "Courier", bold: "Courier-Bold", italic: "Courier-Oblique" },
+  courierBold: { label: "Courier gras", regular: "Courier-Bold", bold: "Courier-Bold", italic: "Courier-BoldOblique" },
+  courierItalic: { label: "Courier italique", regular: "Courier-Oblique", bold: "Courier-BoldOblique", italic: "Courier-Oblique" },
 };
 
 const DEFAULTS = {
@@ -17,6 +21,8 @@ const DEFAULTS = {
   mutedColor: "#8A7B6C",
   lineColor: "#D8CFC0",
   fontFamily: "helvetica",
+  headingFontFamily: "helvetica",
+  bodyFontFamily: "helvetica",
   tagline: "Mobilier & décoration haut de gamme",
   presentationText: "",
   brandName: "",
@@ -26,7 +32,13 @@ const DEFAULTS = {
 
 export async function getTheme(shop) {
   const row = await prisma.catalogueTheme.findUnique({ where: { shop } });
-  return row ? { ...DEFAULTS, ...row } : { ...DEFAULTS, shop };
+  const theme = row ? { ...DEFAULTS, ...row } : { ...DEFAULTS, shop };
+  // Les boutiques déjà configurées conservent leur ancienne police unique.
+  return {
+    ...theme,
+    headingFontFamily: theme.headingFontFamily || theme.fontFamily,
+    bodyFontFamily: theme.bodyFontFamily || theme.fontFamily,
+  };
 }
 
 export async function saveTheme(shop, data) {
@@ -37,6 +49,8 @@ export async function saveTheme(shop, data) {
     mutedColor: data.mutedColor,
     lineColor: data.lineColor,
     fontFamily: FONT_FAMILIES[data.fontFamily] ? data.fontFamily : DEFAULTS.fontFamily,
+    headingFontFamily: FONT_FAMILIES[data.headingFontFamily] ? data.headingFontFamily : DEFAULTS.headingFontFamily,
+    bodyFontFamily: FONT_FAMILIES[data.bodyFontFamily] ? data.bodyFontFamily : DEFAULTS.bodyFontFamily,
     tagline: data.tagline || DEFAULTS.tagline,
     presentationText: data.presentationText?.trim() || "",
     brandName: data.brandName?.trim() || "",

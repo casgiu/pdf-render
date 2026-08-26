@@ -39,6 +39,8 @@ export const action = async ({ request }) => {
     mutedColor: formData.get("mutedColor"),
     lineColor: formData.get("lineColor"),
     fontFamily: formData.get("fontFamily"),
+    headingFontFamily: formData.get("headingFontFamily"),
+    bodyFontFamily: formData.get("bodyFontFamily"),
     tagline: formData.get("tagline"),
     presentationText: formData.get("presentationText"),
     brandName: formData.get("brandName"),
@@ -88,6 +90,8 @@ export default function SettingsPage() {
     mutedColor: theme.mutedColor,
     lineColor: theme.lineColor,
     fontFamily: theme.fontFamily,
+    headingFontFamily: theme.headingFontFamily,
+    bodyFontFamily: theme.bodyFontFamily,
     tagline: theme.tagline,
     presentationText: theme.presentationText,
     brandName: theme.brandName,
@@ -141,7 +145,8 @@ export default function SettingsPage() {
     }
   }
 
-  const fontLabel = fontOptions.find((f) => f.key === values.fontFamily)?.label || values.fontFamily;
+  const headingFontLabel = fontOptions.find((f) => f.key === values.headingFontFamily)?.label || values.headingFontFamily;
+  const bodyFontLabel = fontOptions.find((f) => f.key === values.bodyFontFamily)?.label || values.bodyFontFamily;
 
   function suggestPresentationText() {
     const brandName = values.brandName?.trim() || "Notre maison";
@@ -209,12 +214,27 @@ export default function SettingsPage() {
           <ColorField name="lineColor" label="Lignes de séparation" value={values.lineColor} onChange={set("lineColor")} />
 
           <div style={fieldRowStyle}>
-            <label style={labelStyle} htmlFor="fontFamily">Police</label>
+            <label style={labelStyle} htmlFor="headingFontFamily">Police des titres</label>
             <select
-              id="fontFamily"
-              name="fontFamily"
-              value={values.fontFamily}
-              onChange={(e) => set("fontFamily")(e.target.value)}
+              id="headingFontFamily"
+              name="headingFontFamily"
+              value={values.headingFontFamily}
+              onChange={(e) => set("headingFontFamily")(e.target.value)}
+              style={{ ...textInputStyle, maxWidth: "280px" }}
+            >
+              {fontOptions.map((f) => (
+                <option key={f.key} value={f.key}>{f.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={fieldRowStyle}>
+            <label style={labelStyle} htmlFor="bodyFontFamily">Police du texte</label>
+            <select
+              id="bodyFontFamily"
+              name="bodyFontFamily"
+              value={values.bodyFontFamily}
+              onChange={(e) => set("bodyFontFamily")(e.target.value)}
               style={{ ...textInputStyle, maxWidth: "280px" }}
             >
               {fontOptions.map((f) => (
@@ -272,7 +292,7 @@ export default function SettingsPage() {
             <div style={{ color: values.textColor, fontSize: "18px", fontWeight: "bold" }}>Catalogue — Aperçu</div>
             <div style={{ color: values.accentColor, fontStyle: "italic", marginTop: "6px" }}>{values.tagline}</div>
             <div style={{ color: values.mutedColor, fontSize: "12px", marginTop: "6px" }}>
-              Police PDF : {fontLabel}
+              Titres : {headingFontLabel} · Texte : {bodyFontLabel}
             </div>
           </div>
 
